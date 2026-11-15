@@ -21,10 +21,12 @@ async function fetchHealth(): Promise<void> {
   error.value = null;
 
   try {
-    const response = await fetch('/api/health', {
-      headers: { Accept: 'application/json' },
-      signal: abortController.signal,
-    });
+    const [response] = await Promise.all([fetch('/api/health', {
+        headers: { Accept: 'application/json' },
+        signal: abortController.signal,
+      }),
+      new Promise((resolve) => setTimeout(resolve, 500))
+    ]);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status} ${response.statusText}`);
@@ -49,21 +51,16 @@ onBeforeUnmount(() => abortController?.abort());
   <div class="layout">
     <header class="header">
       <span class="brand">Lexicon</span>
-      <span class="badge">Vue 3 + ASP.NET Core</span>
+      <span class="badge">{{ health?.environment ?? '' }}</span>
     </header>
 
     <main>
       <section class="card">
         <h1>System Status</h1>
-        <p class="subtitle">
-          Served via <strong>SpaProxy</strong> in Development and prebuilt static assets in Release.
-        </p>
-
         <div class="status-box">
           <div class="status-header">
-            <span>Backend Health (<code>/api/health</code>)</span>
             <button type="button" class="btn" :disabled="loading" @click="fetchHealth">
-              {{ loading ? 'Checking...' : 'Refresh' }}
+              &#8634; {{ loading ? 'Checking...' : 'Refresh' }}
             </button>
           </div>
 
@@ -78,8 +75,8 @@ onBeforeUnmount(() => abortController?.abort());
               <dd>{{ health.environment }}</dd>
             </div>
             <div>
-              <dt>Timestamp (UTC)</dt>
-              <dd>{{ health.timestampUtc }}</dd>
+              <dt>Timestamp</dt>
+              <dd>{{ new Date(health.timestampUtc).toLocaleString() }}</dd>
             </div>
           </dl>
         </div>
