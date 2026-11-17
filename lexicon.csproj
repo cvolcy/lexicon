@@ -7,8 +7,7 @@
     <SpaRoot>ClientApp\</SpaRoot>
     <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>http://localhost:5173</SpaProxyServerUrl>
-    <BuildClientAppOnBuild
-      Condition="'$(BuildClientAppOnBuild)' == '' And '$(Configuration)' == 'Release'">true</BuildClientAppOnBuild>
+    <BuildClientAppOnBuild Condition="'$(BuildClientAppOnBuild)' == '' And '$(Configuration)' == 'Release'">true</BuildClientAppOnBuild>
     <DefaultItemExcludes>
       $(DefaultItemExcludes);$(SpaRoot)node_modules\**;$(SpaRoot)dist\**;wwwroot\**</DefaultItemExcludes>
   </PropertyGroup>
@@ -16,6 +15,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
   </ItemGroup>
 
 
@@ -26,13 +26,11 @@
     <None Include="$(SpaRoot)**" Exclude="$(SpaRoot)node_modules\**" />
   </ItemGroup>
 
-  <Target Name="EnsureNodeModules" BeforeTargets="Build"
-    Condition="!Exists('$(SpaRoot)node_modules')">
+  <Target Name="EnsureNodeModules" BeforeTargets="Build" Condition="!Exists('$(SpaRoot)node_modules')">
     <Exec Command="node --version" ContinueOnError="true">
       <Output TaskParameter="ExitCode" PropertyName="ErrorCode" />
     </Exec>
-    <Error Condition="'$(ErrorCode)' != '0'"
-      Text="Node.js is required to build and run this project. Install it from https://nodejs.org/." />
+    <Error Condition="'$(ErrorCode)' != '0'" Text="Node.js is required to build and run this project. Install it from https://nodejs.org/." />
     <Exec WorkingDirectory="$(SpaRoot)" Command="npm install" />
   </Target>
 
@@ -41,8 +39,7 @@
     <Exec WorkingDirectory="$(SpaRoot)" Command="npm run build" />
     <ItemGroup>
       <ClientDistFiles Include="wwwroot\**" />
-      <ResolvedFileToPublish Include="@(ClientDistFiles->'%(FullPath)')"
-        Exclude="@(ResolvedFileToPublish)">
+      <ResolvedFileToPublish Include="@(ClientDistFiles->'%(FullPath)')" Exclude="@(ResolvedFileToPublish)">
         <RelativePath>%(ClientDistFiles.Identity)</RelativePath>
         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
         <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
