@@ -4,7 +4,7 @@ public class Document
 {
     public Guid DocumentId { get; set; }
 
-    /// <summary>Original file name as uploaded by the user (display only, never used as a path).</summary>
+    /// <summary>Original file name as uploaded by the user.</summary>
     public required string FileName { get; set; }
 
     public required string ContentType { get; set; }
