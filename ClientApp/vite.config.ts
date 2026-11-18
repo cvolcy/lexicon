@@ -2,9 +2,22 @@ import { fileURLToPath, URL } from 'node:url';
 import { env } from 'node:process';
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import ui from '@nuxt/ui/vite';
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    ui({
+      ui: {
+        colors: {
+          primary: 'emerald',
+          neutral: 'slate',
+        },
+      },
+      components: { dts: 'src/components.d.ts' },
+      autoImport: { dts: 'src/auto-imports.d.ts' },
+    }),
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
