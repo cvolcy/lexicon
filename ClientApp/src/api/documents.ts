@@ -16,3 +16,7 @@ export interface DocumentViewModel {
   createdAt: string;
   updatedAt: string;
 }
+
+export function getDocumentDownloadUrl(documentId: string): string {
+  return `/api/documents/${encodeURIComponent(documentId)}/file`;
+}

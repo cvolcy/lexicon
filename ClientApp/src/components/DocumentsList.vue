@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useFileDialog } from '@vueuse/core';
 import type { BadgeProps } from '@nuxt/ui';
-import type { DocumentStatus } from '@/api/documents';
+import { getDocumentDownloadUrl, type DocumentStatus } from '@/api/documents';
 import { useDocuments } from '@/composables/useDocuments';
 
 const { documents, loading, busy, error, refresh, create, remove } = useDocuments();
@@ -87,15 +87,27 @@ onChange(async (files) => {
           </div>
           <div v-if="document.error" class="text-xs text-error">{{ document.error }}</div>
         </div>
-        <UButton
-          icon="i-lucide-trash-2"
-          color="error"
-          variant="ghost"
-          size="sm"
-          :disabled="busy"
-          :aria-label="`Delete ${document.fileName}`"
-          @click="remove(document.documentId)"
-        />
+        <div class="flex shrink-0 items-center gap-1">
+          <UButton
+            icon="i-lucide-download"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            :to="getDocumentDownloadUrl(document.documentId)"
+            external
+            :download="document.fileName"
+            :aria-label="`Download ${document.fileName}`"
+          />
+          <UButton
+            icon="i-lucide-trash-2"
+            color="error"
+            variant="ghost"
+            size="sm"
+            :disabled="busy"
+            :aria-label="`Delete ${document.fileName}`"
+            @click="remove(document.documentId)"
+          />
+        </div>
       </li>
     </ul>
   </UCard>
