@@ -33,6 +33,8 @@ public static class DbContextServiceCollectionExtensions
                     $"Database provider '{provider}' (configured in '{ProviderConfigurationKey}') is not supported.");
         }
 
+        services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
+
         return services;
     }
 

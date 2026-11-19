@@ -1,5 +1,15 @@
+export type HealthStatus = 'Healthy' | 'Degraded' | 'Unhealthy';
+
+export interface HealthCheckEntryViewModel {
+  name: string;
+  status: HealthStatus;
+  description: string | null;
+  durationMs: number;
+}
+
 export interface HealthViewModel {
-  status: string;
+  status: HealthStatus;
   environment: string;
   timestampUtc: string;
+  checks: HealthCheckEntryViewModel[];
 }

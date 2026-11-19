@@ -37,5 +37,6 @@ public static class DocumentStorageServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddSingleton<IDocumentStorage, LocalFileSystemDocumentStorage>();
+        services.AddHealthChecks().AddCheck<LocalFileSystemStorageHealthCheck>("storage");
     }
 }

@@ -10,13 +10,9 @@ public sealed class LocalFileSystemDocumentStorage : IDocumentStorage
         IOptions<LocalFileSystemStorageOptions> options,
         IHostEnvironment environment)
     {
-        var configuredPath = options.Value.RootPath;
-        var combinedPath = Path.IsPathRooted(configuredPath)
-            ? configuredPath
-            : Path.Combine(environment.ContentRootPath, configuredPath);
-
-        _rootPath = Path.GetFullPath(combinedPath)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        _rootPath = LocalFileSystemStoragePath.ResolveRootPath(
+            options.Value.RootPath,
+            environment.ContentRootPath);
 
         Directory.CreateDirectory(_rootPath);
     }
