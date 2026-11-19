@@ -1,5 +1,6 @@
 using Lexicon.Infrastructure.Ingestion;
 using Lexicon.Infrastructure.Persistence;
+using Lexicon.Infrastructure.Retrieval;
 using Lexicon.Infrastructure.Storage;
 using Lexicon.Models.Documents;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,8 @@ public sealed class DocumentService(
     LexiconDbContext dbContext,
     IDocumentStorage documentStorage,
     IIngestionQueue ingestionQueue,
+    IVectorStore vectorStore,
+    IKeywordIndex keywordIndex,
     ILogger<DocumentService> logger) : IDocumentService
 {
     public async Task<IReadOnlyList<DocumentViewModel>> ListAsync(CancellationToken cancellationToken = default)
@@ -135,8 +138,14 @@ public sealed class DocumentService(
             return false;
         }
 
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        await keywordIndex.DeleteByDocumentAsync(documentId, cancellationToken);
+        await vectorStore.DeleteByDocumentAsync(documentId, cancellationToken);
+
         dbContext.Documents.Remove(document);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         await documentStorage.DeleteAsync(document.StorageKey, cancellationToken);
 
