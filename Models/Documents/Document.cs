@@ -25,4 +25,6 @@ public class Document
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
+
+    public ICollection<DocumentChunk> Chunks { get; set; } = [];
 }
