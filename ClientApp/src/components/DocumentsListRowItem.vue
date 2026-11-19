@@ -10,10 +10,12 @@ import { formatBytes, formatDateTime } from '@/utils/format';
 defineProps<{
   document: DocumentViewModel;
   deleting?: boolean;
+  reindexing?: boolean;
   disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
+  reindex: [documentId: string];
   delete: [documentId: string];
 }>();
 
@@ -38,12 +40,25 @@ const statusColors: Record<DocumentStatus, BadgeProps['color']> = {
         />
       </div>
       <div class="text-xs text-muted">
-        {{ formatBytes(document.sizeBytes) }} · {{ document.contentType }} ·
-        {{ formatDateTime(document.createdAt) }}
+        {{ formatBytes(document.sizeBytes) }} · {{ document.contentType }}
+        <template v-if="document.status === 'Ready'">
+          · {{ document.chunkCount }} {{ document.chunkCount === 1 ? 'chunk' : 'chunks' }}
+        </template>
+        · {{ formatDateTime(document.createdAt) }}
       </div>
       <div v-if="document.error" class="text-xs text-error">{{ document.error }}</div>
     </div>
     <div class="flex shrink-0 items-center gap-1">
+      <UButton
+        icon="i-lucide-rotate-cw"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        :loading="reindexing"
+        :disabled="disabled || document.status === 'Pending' || document.status === 'Processing'"
+        :aria-label="`Reindex ${document.fileName}`"
+        @click="emit('reindex', document.documentId)"
+      />
       <UButton
         icon="i-lucide-download"
         color="neutral"

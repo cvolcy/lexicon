@@ -8,16 +8,19 @@ const {
   loading,
   creating,
   deletingId,
+  reindexingId,
   busy,
   error,
   clearError,
   refresh,
   create,
+  reindex,
   remove,
 } = useDocuments();
 
 const { open: openFileDialog, reset: resetFileDialog, onChange } = useFileDialog({
   multiple: false,
+  accept: '.txt,.md,.pdf',
 });
 
 onChange(async (files) => {
@@ -78,7 +81,9 @@ onChange(async (files) => {
         :key="document.documentId"
         :document="document"
         :deleting="deletingId === document.documentId"
+        :reindexing="reindexingId === document.documentId"
         :disabled="busy"
+        @reindex="reindex"
         @delete="remove"
       />
     </ul>

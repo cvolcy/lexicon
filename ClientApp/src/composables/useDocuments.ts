@@ -1,4 +1,5 @@
-import { computed, ref, shallowRef } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
+import { useIntervalFn } from '@vueuse/core';
 import { useApi } from '@/api/client';
 import type { DocumentViewModel } from '@/api/documents';
 import type { CollectionResponse } from '@/api/types';
@@ -11,18 +12,48 @@ export function useDocuments() {
     .post(createPayload)
     .json<DocumentViewModel>();
 
+  const reindexId = ref('');
+  const reindexUrl = computed(() => `/documents/${encodeURIComponent(reindexId.value)}/reindex`);
+  const reindexRequest = useApi(reindexUrl, { immediate: false })
+    .post()
+    .json<DocumentViewModel>();
+
   const deleteId = ref('');
   const deleteUrl = computed(() => `/documents/${encodeURIComponent(deleteId.value)}`);
   const deleteRequest = useApi(deleteUrl, { immediate: false }).delete();
 
+  const reindexingId = ref<string | null>(null);
   const deletingId = ref<string | null>(null);
+  const isPolling = ref(false);
   const actionError = ref<string | null>(null);
 
   const documents = computed(() => list.data.value?.items ?? []);
-  const loading = computed(() => list.isFetching.value);
+  const loading = computed(() => list.isFetching.value && !isPolling.value);
   const creating = computed(() => createRequest.isFetching.value);
-  const busy = computed(() => creating.value || deletingId.value !== null);
+  const busy = computed(
+    () => creating.value || deletingId.value !== null || reindexingId.value !== null,
+  );
   const error = computed<string | null>(() => actionError.value ?? list.error.value ?? null);
+
+  const hasInFlight = computed(() =>
+    documents.value.some((d) => d.status === 'Pending' || d.status === 'Processing'),
+  );
+
+  async function poll(): Promise<void> {
+    if (list.isFetching.value || busy.value) {
+      return;
+    }
+
+    isPolling.value = true;
+    try {
+      await list.execute();
+    } finally {
+      isPolling.value = false;
+    }
+  }
+
+  const { pause, resume } = useIntervalFn(poll, 2000, { immediate: false });
+  watch(hasInFlight, (active) => (active ? resume() : pause()), { immediate: true });
 
   function clearError(): void {
     actionError.value = null;
@@ -58,6 +89,17 @@ export function useDocuments() {
     }
   }
 
+  async function reindex(documentId: string): Promise<void> {
+    reindexId.value = documentId;
+    reindexingId.value = documentId;
+
+    try {
+      await mutate(reindexRequest);
+    } finally {
+      reindexingId.value = null;
+    }
+  }
+
   async function remove(documentId: string): Promise<void> {
     deleteId.value = documentId;
     deletingId.value = documentId;
@@ -69,5 +111,18 @@ export function useDocuments() {
     }
   }
 
-  return { documents, loading, creating, deletingId, busy, error, clearError, refresh, create, remove };
+  return {
+    documents,
+    loading,
+    creating,
+    deletingId,
+    reindexingId,
+    busy,
+    error,
+    clearError,
+    refresh,
+    create,
+    reindex,
+    remove,
+  };
 }
