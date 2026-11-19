@@ -17,6 +17,35 @@ namespace Lexicon.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
+            modelBuilder.Entity("Lexicon.Models.Documents.ChunkVector", b =>
+                {
+                    b.Property<Guid>("ChunkId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Dimensions")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("Embedding")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ChunkId");
+
+                    b.HasIndex("DocumentId");
+
+                    b.HasIndex("Model");
+
+                    b.ToTable("ChunkVectors", (string)null);
+                });
+
             modelBuilder.Entity("Lexicon.Models.Documents.Document", b =>
                 {
                     b.Property<Guid>("DocumentId")
@@ -102,6 +131,17 @@ namespace Lexicon.Infrastructure.Persistence.Migrations
                     b.ToTable("DocumentChunks", (string)null);
                 });
 
+            modelBuilder.Entity("Lexicon.Models.Documents.ChunkVector", b =>
+                {
+                    b.HasOne("Lexicon.Models.Documents.DocumentChunk", "Chunk")
+                        .WithOne("Vector")
+                        .HasForeignKey("Lexicon.Models.Documents.ChunkVector", "ChunkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Chunk");
+                });
+
             modelBuilder.Entity("Lexicon.Models.Documents.DocumentChunk", b =>
                 {
                     b.HasOne("Lexicon.Models.Documents.Document", "Document")
@@ -116,6 +156,11 @@ namespace Lexicon.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Lexicon.Models.Documents.Document", b =>
                 {
                     b.Navigation("Chunks");
+                });
+
+            modelBuilder.Entity("Lexicon.Models.Documents.DocumentChunk", b =>
+                {
+                    b.Navigation("Vector");
                 });
 #pragma warning restore 612, 618
         }

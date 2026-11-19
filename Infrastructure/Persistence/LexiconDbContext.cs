@@ -9,6 +9,8 @@ public class LexiconDbContext(DbContextOptions<LexiconDbContext> options) : DbCo
 
     public DbSet<DocumentChunk> DocumentChunks => Set<DocumentChunk>();
 
+    public DbSet<ChunkVector> ChunkVectors => Set<ChunkVector>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LexiconDbContext).Assembly);
