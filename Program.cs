@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Lexicon.Infrastructure.Persistence;
+using Lexicon.Infrastructure.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +8,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddLexiconDbContext(builder.Configuration);
+builder.Services.AddLexiconDocumentStorage(builder.Configuration);
 
 var app = builder.Build();
 

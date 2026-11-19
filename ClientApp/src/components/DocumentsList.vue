@@ -1,7 +1,34 @@
 <script setup lang="ts">
+import { useFileDialog } from '@vueuse/core';
+import type { BadgeProps } from '@nuxt/ui';
+import type { DocumentStatus } from '@/api/documents';
 import { useDocuments } from '@/composables/useDocuments';
 
 const { documents, loading, busy, error, refresh, create, remove } = useDocuments();
+
+const statusColors: Record<DocumentStatus, BadgeProps['color']> = {
+  Pending: 'neutral',
+  Processing: 'info',
+  Ready: 'success',
+  Failed: 'error',
+};
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const { open: openFileDialog, reset: resetFileDialog, onChange } = useFileDialog({
+  multiple: false,
+});
+
+onChange(async (files) => {
+  const file = files?.[0];
+  if (!file) return;
+  resetFileDialog();
+  await create(file);
+});
 </script>
 
 <template>
@@ -21,7 +48,13 @@ const { documents, loading, busy, error, refresh, create, remove } = useDocument
           >
             Refresh
           </UButton>
-          <UButton icon="i-lucide-plus" size="sm" :loading="busy" :disabled="loading" @click="create">
+          <UButton
+            icon="i-lucide-plus"
+            size="sm"
+            :loading="busy"
+            :disabled="loading"
+            @click="() => openFileDialog()"
+          >
             New
           </UButton>
         </div>
@@ -39,8 +72,20 @@ const { documents, loading, busy, error, refresh, create, remove } = useDocument
         class="flex items-center justify-between gap-4 py-3"
       >
         <div class="min-w-0">
-          <div class="font-mono text-sm break-all">{{ document.documentId }}</div>
-          <div class="text-xs text-muted">{{ new Date(document.createdAt).toLocaleString() }}</div>
+          <div class="flex items-center gap-2">
+            <span class="truncate font-medium">{{ document.fileName }}</span>
+            <UBadge
+              :label="document.status"
+              :color="statusColors[document.status]"
+              variant="subtle"
+              size="sm"
+            />
+          </div>
+          <div class="text-xs text-muted">
+            {{ formatSize(document.sizeBytes) }} · {{ document.contentType }} ·
+            {{ new Date(document.createdAt).toLocaleString() }}
+          </div>
+          <div v-if="document.error" class="text-xs text-error">{{ document.error }}</div>
         </div>
         <UButton
           icon="i-lucide-trash-2"
@@ -48,7 +93,7 @@ const { documents, loading, busy, error, refresh, create, remove } = useDocument
           variant="ghost"
           size="sm"
           :disabled="busy"
-          :aria-label="`Delete document ${document.documentId}`"
+          :aria-label="`Delete ${document.fileName}`"
           @click="remove(document.documentId)"
         />
       </li>

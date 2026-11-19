@@ -1,12 +1,13 @@
-import { computed, ref } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 import { useApi } from '@/api/client';
 import type { CollectionResponse, DocumentViewModel } from '@/api/documents';
 
 export function useDocuments() {
   const list = useApi('/documents').get().json<CollectionResponse<DocumentViewModel>>();
 
+  const createPayload = shallowRef<FormData | null>(null);
   const createRequest = useApi('/documents', { immediate: false })
-    .post()
+    .post(createPayload)
     .json<DocumentViewModel>();
 
   const deleteId = ref('');
@@ -37,7 +38,10 @@ export function useDocuments() {
     await list.execute();
   }
 
-  function create(): Promise<void> {
+  function create(file: File): Promise<void> {
+    const formData = new FormData();
+    formData.append('file', file);
+    createPayload.value = formData;
     return mutate(createRequest);
   }
 

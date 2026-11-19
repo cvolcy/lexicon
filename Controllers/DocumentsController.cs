@@ -1,4 +1,5 @@
 using Lexicon.Infrastructure.Persistence;
+using Lexicon.Infrastructure.Storage;
 using Lexicon.Models;
 using Lexicon.Models.Documents;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +9,10 @@ namespace Lexicon.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class DocumentsController(LexiconDbContext dbContext) : ControllerBase
+public class DocumentsController(
+    LexiconDbContext dbContext,
+    IDocumentStorage documentStorage,
+    ILogger<DocumentsController> logger) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType<CollectionResponse<DocumentViewModel>>(StatusCodes.Status200OK)]
@@ -37,24 +41,47 @@ public class DocumentsController(LexiconDbContext dbContext) : ControllerBase
 
         var now = DateTimeOffset.UtcNow;
         var documentId = Guid.CreateVersion7();
+        var fileName = Path.GetFileName(file.FileName);
+
+        await using var stream = file.OpenReadStream();
+        var storageKey = await documentStorage.SaveAsync(documentId, fileName, stream, cancellationToken);
 
         var document = new Document
         {
             DocumentId = documentId,
-            FileName = Path.GetFileName(file.FileName),
+            FileName = fileName,
             ContentType = string.IsNullOrWhiteSpace(file.ContentType)
                 ? "application/octet-stream"
                 : file.ContentType,
             SizeBytes = file.Length,
-            // Placeholder until a real IDocumentStorage assigns the key.
-            StorageKey = documentId.ToString("N"),
+            StorageKey = storageKey,
             Status = DocumentStatus.Pending,
             CreatedAt = now,
             UpdatedAt = now,
         };
 
-        dbContext.Documents.Add(document);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            dbContext.Documents.Add(document);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            try
+            {
+                await documentStorage.DeleteAsync(storageKey, CancellationToken.None);
+            }
+            catch (Exception cleanupEx)
+            {
+                logger.LogWarning(
+                    cleanupEx,
+                    "Failed to clean up stored file '{StorageKey}' after database save failure for document {DocumentId}.",
+                    storageKey,
+                    documentId);
+            }
+
+            throw;
+        }
 
         return CreatedAtAction(
             nameof(Get),
@@ -76,15 +103,49 @@ public class DocumentsController(LexiconDbContext dbContext) : ControllerBase
         return document is null ? NotFound() : Ok(document);
     }
 
+    [HttpGet("{documentId:guid}/file")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Download(Guid documentId, CancellationToken cancellationToken)
+    {
+        var document = await dbContext.Documents
+            .AsNoTracking()
+            .Where(d => d.DocumentId == documentId)
+            .Select(d => new { d.StorageKey, d.ContentType, d.FileName })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (document is null)
+        {
+            return NotFound();
+        }
+
+        var stream = await documentStorage.OpenReadAsync(document.StorageKey, cancellationToken);
+        if (stream is null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, document.ContentType, document.FileName, enableRangeProcessing: true);
+    }
+
     [HttpDelete("{documentId:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid documentId, CancellationToken cancellationToken)
     {
-        var deleted = await dbContext.Documents
-            .Where(d => d.DocumentId == documentId)
-            .ExecuteDeleteAsync(cancellationToken);
+        var document = await dbContext.Documents
+            .SingleOrDefaultAsync(d => d.DocumentId == documentId, cancellationToken);
 
-        return deleted == 0 ? NotFound() : NoContent();
+        if (document is null)
+        {
+            return NotFound();
+        }
+
+        dbContext.Documents.Remove(document);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await documentStorage.DeleteAsync(document.StorageKey, cancellationToken);
+
+        return NoContent();
     }
 }
