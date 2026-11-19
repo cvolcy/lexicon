@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ColorModeSwitcher: typeof import('./components/ColorModeSwitcher.vue')['default']
     DocumentsList: typeof import('./components/DocumentsList.vue')['default']
     DocumentsListRowItem: typeof import('./components/DocumentsListRowItem.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
@@ -21,6 +22,7 @@ declare module 'vue' {
     UButton: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/Button.vue')['default']
     UCard: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/Card.vue')['default']
     UContainer: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/Container.vue')['default']
+    UDropdownMenu: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/DropdownMenu.vue')['default']
     UEmpty: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/Empty.vue')['default']
     UNavigationMenu: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/NavigationMenu.vue')['default']
   }

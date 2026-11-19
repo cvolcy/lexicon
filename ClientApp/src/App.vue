@@ -2,6 +2,9 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import DefaultLayout from '@/layouts/DefaultLayout.vue';
+import { useColorModeStore } from '@/stores/colorMode';
+
+useColorModeStore();
 
 const layouts = {
   default: DefaultLayout,

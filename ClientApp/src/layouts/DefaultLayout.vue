@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui';
+import ColorModeSwitcher from '@/components/ColorModeSwitcher.vue';
 
 const items: NavigationMenuItem[] = [
   { label: 'Home', icon: 'i-lucide-house', to: '/' },
@@ -12,7 +13,10 @@ const items: NavigationMenuItem[] = [
   <UContainer class="max-w-3xl py-6">
     <header class="flex items-center justify-between gap-4 border-b border-default pb-4">
       <RouterLink to="/" class="text-xl font-bold tracking-tight">Lexicon</RouterLink>
-      <UNavigationMenu :items="items" />
+      <div class="flex items-center gap-2">
+        <UNavigationMenu :items="items" />
+        <ColorModeSwitcher />
+      </div>
     </header>
 
     <main class="py-8">

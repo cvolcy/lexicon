@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [
     vue(),
     ui({
+      colorMode: false, // Prevent from conflicting with store color mode management
       ui: {
         colors: {
           primary: 'emerald',
