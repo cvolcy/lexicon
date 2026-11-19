@@ -12,6 +12,7 @@ const pageIcon = computed(() => route.meta.icon);
 const navItems: NavigationMenuItem[] = [
   { label: 'Overview', icon: 'i-lucide-layout-dashboard', to: '/' },
   { label: 'Documents', icon: 'i-lucide-files', to: '/documents' },
+  { label: 'Search', icon: 'i-lucide-search', to: '/search' },
   { label: 'System Health', icon: 'i-lucide-activity', to: '/health' },
 ];
 </script>

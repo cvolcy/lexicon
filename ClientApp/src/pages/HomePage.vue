@@ -52,14 +52,21 @@ const pipelineStages: {
   },
   {
     name: 'Ingestion',
-    description: 'PDF, Markdown & text chunking',
+    description: 'Extraction, chunking & Ollama embeddings',
     status: 'Active',
     color: 'success',
     icon: 'i-lucide-cpu',
   },
   {
-    name: 'Retrieval & Chat',
-    description: 'Ollama embeddings & cited Q&A',
+    name: 'Hybrid Search',
+    description: 'SQLite vector similarity + FTS5 RRF',
+    status: 'Active',
+    color: 'success',
+    icon: 'i-lucide-search',
+  },
+  {
+    name: 'Cited Chat',
+    description: 'Streaming grounded Q&A over SSE',
     status: 'Next',
     color: 'neutral',
     icon: 'i-lucide-sparkles',
@@ -93,6 +100,9 @@ const pipelineStages: {
 
         <div class="flex flex-wrap gap-2.5 pt-1">
           <UButton to="/documents" icon="i-lucide-files">Manage Documents</UButton>
+          <UButton to="/search" icon="i-lucide-search" color="neutral" variant="soft">
+            Search Knowledge Base
+          </UButton>
           <UButton to="/health" icon="i-lucide-activity" color="neutral" variant="outline">
             System Health
           </UButton>

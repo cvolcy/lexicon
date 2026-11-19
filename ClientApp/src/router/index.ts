@@ -34,13 +34,23 @@ const router = createRouter({
       },
     },
     {
+      path: '/search',
+      name: 'search',
+      component: () => import('@/pages/SearchPage.vue'),
+      meta: {
+        title: 'Search',
+        icon: 'i-lucide-search',
+        description: 'Hybrid semantic and keyword search across your indexed documents',
+      },
+    },
+    {
       path: '/health',
       name: 'health',
       component: () => import('@/pages/HealthPage.vue'),
       meta: {
         title: 'System Health',
         icon: 'i-lucide-activity',
-        description: 'Live diagnostics for database and document storage',
+        description: 'Live diagnostics for database, storage, and AI providers',
       },
     },
     {
