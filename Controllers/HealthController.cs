@@ -1,3 +1,4 @@
+using Lexicon.Models.Health;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Lexicon.Controllers;
@@ -7,13 +8,9 @@ namespace Lexicon.Controllers;
 public class HealthController(IHostEnvironment env) : ControllerBase
 {
     [HttpGet]
-    public IActionResult Index()
-    {
-        return Ok(new
-        {
-            Status = "ok",
-            Environment = env.EnvironmentName,
-            TimestampUtc = DateTimeOffset.UtcNow
-        });
-    }
+    [ProducesResponseType<HealthViewModel>(StatusCodes.Status200OK)]
+    public IActionResult Index() => Ok(new HealthViewModel(
+        Status: "ok",
+        Environment: env.EnvironmentName,
+        TimestampUtc: DateTimeOffset.UtcNow));
 }

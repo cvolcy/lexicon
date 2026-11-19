@@ -25,5 +25,14 @@ public record DocumentViewModel(
         d.CreatedAt,
         d.UpdatedAt);
 
-    public static DocumentViewModel From(Document document) => Projection.Compile()(document);
+    public static DocumentViewModel From(Document document) => new(
+        document.DocumentId,
+        document.FileName,
+        document.ContentType,
+        document.SizeBytes,
+        document.Status,
+        document.Error,
+        document.ChunkCount,
+        document.CreatedAt,
+        document.UpdatedAt);
 }

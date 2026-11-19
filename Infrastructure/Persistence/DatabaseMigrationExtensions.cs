@@ -5,7 +5,9 @@ namespace Lexicon.Infrastructure.Persistence;
 public static class DatabaseMigrationExtensions
 {
     /// <summary>Applies any pending EF Core migrations to the Lexicon database.</summary>
-    public static async Task MigrateLexiconDatabaseAsync(this WebApplication app)
+    public static async Task MigrateLexiconDatabaseAsync(
+        this WebApplication app,
+        CancellationToken cancellationToken = default)
     {
         await using var scope = app.Services.CreateAsyncScope();
 
@@ -14,13 +16,13 @@ public static class DatabaseMigrationExtensions
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger(typeof(DatabaseMigrationExtensions).FullName!);
 
-        var pending = (await dbContext.Database.GetPendingMigrationsAsync()).ToList();
+        var pending = (await dbContext.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
         if (pending.Count == 0)
         {
             return;
         }
 
         logger.LogInformation("Applying {Count} pending database migration(s): {Migrations}", pending.Count, pending);
-        await dbContext.Database.MigrateAsync();
+        await dbContext.Database.MigrateAsync(cancellationToken);
     }
 }

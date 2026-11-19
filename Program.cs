@@ -1,18 +1,24 @@
 using System.Text.Json.Serialization;
 using Lexicon.Infrastructure.Persistence;
 using Lexicon.Infrastructure.Storage;
+using Lexicon.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails();
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddLexiconDbContext(builder.Configuration);
 builder.Services.AddLexiconDocumentStorage(builder.Configuration);
+builder.Services.AddLexiconServices();
 
 var app = builder.Build();
 
 await app.MigrateLexiconDatabaseAsync();
+
+app.UseExceptionHandler();
+app.UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
 {

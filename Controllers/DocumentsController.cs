@@ -1,29 +1,22 @@
-using Lexicon.Infrastructure.Persistence;
-using Lexicon.Infrastructure.Storage;
 using Lexicon.Models;
 using Lexicon.Models.Documents;
+using Lexicon.Services.Documents;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace Lexicon.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class DocumentsController(
-    LexiconDbContext dbContext,
-    IDocumentStorage documentStorage,
-    ILogger<DocumentsController> logger) : ControllerBase
+public class DocumentsController(IDocumentService documentService) : ControllerBase
 {
+    private const int MaxFileNameLength = 255;
+    private const int MaxContentTypeLength = 255;
+
     [HttpGet]
     [ProducesResponseType<CollectionResponse<DocumentViewModel>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
-        var documents = await dbContext.Documents
-            .AsNoTracking()
-            .OrderByDescending(d => d.CreatedAt)
-            .Select(DocumentViewModel.Projection)
-            .ToListAsync(cancellationToken);
-
+        var documents = await documentService.ListAsync(cancellationToken);
         return Ok(new CollectionResponse<DocumentViewModel>(documents));
     }
 
@@ -33,60 +26,38 @@ public class DocumentsController(
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create(IFormFile file, CancellationToken cancellationToken)
     {
+        var fileName = Path.GetFileName(file.FileName)?.Trim() ?? string.Empty;
+
         if (file.Length == 0)
         {
             ModelState.AddModelError(nameof(file), "The uploaded file cannot be empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            ModelState.AddModelError(nameof(file), "A valid file name is required.");
+        }
+        else if (fileName.Length > MaxFileNameLength)
+        {
+            ModelState.AddModelError(nameof(file), $"File name must be at most {MaxFileNameLength} characters.");
+        }
+
+        if (!ModelState.IsValid)
+        {
             return ValidationProblem(ModelState);
         }
 
-        var now = DateTimeOffset.UtcNow;
-        var documentId = Guid.CreateVersion7();
-        var fileName = Path.GetFileName(file.FileName);
+        var contentType = string.IsNullOrWhiteSpace(file.ContentType) || file.ContentType.Length > MaxContentTypeLength
+            ? "application/octet-stream"
+            : file.ContentType;
 
         await using var stream = file.OpenReadStream();
-        var storageKey = await documentStorage.SaveAsync(documentId, fileName, stream, cancellationToken);
-
-        var document = new Document
-        {
-            DocumentId = documentId,
-            FileName = fileName,
-            ContentType = string.IsNullOrWhiteSpace(file.ContentType)
-                ? "application/octet-stream"
-                : file.ContentType,
-            SizeBytes = file.Length,
-            StorageKey = storageKey,
-            Status = DocumentStatus.Pending,
-            CreatedAt = now,
-            UpdatedAt = now,
-        };
-
-        try
-        {
-            dbContext.Documents.Add(document);
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch
-        {
-            try
-            {
-                await documentStorage.DeleteAsync(storageKey, CancellationToken.None);
-            }
-            catch (Exception cleanupEx)
-            {
-                logger.LogWarning(
-                    cleanupEx,
-                    "Failed to clean up stored file '{StorageKey}' after database save failure for document {DocumentId}.",
-                    storageKey,
-                    documentId);
-            }
-
-            throw;
-        }
+        var document = await documentService.CreateAsync(fileName, contentType, file.Length, stream, cancellationToken);
 
         return CreatedAtAction(
             nameof(Get),
             new { documentId = document.DocumentId },
-            DocumentViewModel.From(document));
+            document);
     }
 
     [HttpGet("{documentId:guid}")]
@@ -94,12 +65,7 @@ public class DocumentsController(
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Get(Guid documentId, CancellationToken cancellationToken)
     {
-        var document = await dbContext.Documents
-            .AsNoTracking()
-            .Where(d => d.DocumentId == documentId)
-            .Select(DocumentViewModel.Projection)
-            .SingleOrDefaultAsync(cancellationToken);
-
+        var document = await documentService.GetAsync(documentId, cancellationToken);
         return document is null ? NotFound() : Ok(document);
     }
 
@@ -108,24 +74,13 @@ public class DocumentsController(
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Download(Guid documentId, CancellationToken cancellationToken)
     {
-        var document = await dbContext.Documents
-            .AsNoTracking()
-            .Where(d => d.DocumentId == documentId)
-            .Select(d => new { d.StorageKey, d.ContentType, d.FileName })
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (document is null)
+        var result = await documentService.OpenDownloadAsync(documentId, cancellationToken);
+        if (result is null)
         {
             return NotFound();
         }
 
-        var stream = await documentStorage.OpenReadAsync(document.StorageKey, cancellationToken);
-        if (stream is null)
-        {
-            return NotFound();
-        }
-
-        return File(stream, document.ContentType, document.FileName, enableRangeProcessing: true);
+        return File(result.Content, result.ContentType, result.FileName, enableRangeProcessing: true);
     }
 
     [HttpDelete("{documentId:guid}")]
@@ -133,19 +88,7 @@ public class DocumentsController(
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid documentId, CancellationToken cancellationToken)
     {
-        var document = await dbContext.Documents
-            .SingleOrDefaultAsync(d => d.DocumentId == documentId, cancellationToken);
-
-        if (document is null)
-        {
-            return NotFound();
-        }
-
-        dbContext.Documents.Remove(document);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        await documentStorage.DeleteAsync(document.StorageKey, cancellationToken);
-
-        return NoContent();
+        var deleted = await documentService.DeleteAsync(documentId, cancellationToken);
+        return deleted ? NoContent() : NotFound();
     }
 }
