@@ -39,6 +39,7 @@ const statusMeta: Record<
 const checkIcons: Record<string, string> = {
   database: 'i-lucide-database',
   storage: 'i-lucide-hard-drive',
+  ai: 'i-lucide-sparkles',
 };
 
 const overall = computed(() => (health.value ? statusMeta[health.value.status] : null));
@@ -50,7 +51,7 @@ const overall = computed(() => (health.value ? statusMeta[health.value.status] :
       <div>
         <h1 class="text-2xl font-semibold tracking-tight text-highlighted">System Health</h1>
         <p class="mt-1 text-sm text-muted">
-          Real-time status of Lexicon's local database and storage providers.
+          Real-time status of Lexicon's local database, storage, and AI providers.
         </p>
       </div>
 
