@@ -17,4 +17,6 @@ public class DocumentChunk
     public int TokenCount { get; set; }
 
     public Document Document { get; set; } = null!;
+
+    public ChunkVector? Vector { get; set; }
 }
