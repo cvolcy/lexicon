@@ -3,7 +3,18 @@ import { useFileDialog } from '@vueuse/core';
 import DocumentsListRowItem from '@/components/DocumentsListRowItem.vue';
 import { useDocuments } from '@/composables/useDocuments';
 
-const { documents, loading, busy, error, refresh, create, remove } = useDocuments();
+const {
+  documents,
+  loading,
+  creating,
+  deletingId,
+  busy,
+  error,
+  clearError,
+  refresh,
+  create,
+  remove,
+} = useDocuments();
 
 const { open: openFileDialog, reset: resetFileDialog, onChange } = useFileDialog({
   multiple: false,
@@ -21,7 +32,7 @@ onChange(async (files) => {
   <UCard>
     <template #header>
       <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold">Documents</h2>
+        <h1 class="text-lg font-semibold">Documents</h1>
         <div class="flex gap-2">
           <UButton
             icon="i-lucide-refresh-cw"
@@ -37,8 +48,8 @@ onChange(async (files) => {
           <UButton
             icon="i-lucide-plus"
             size="sm"
-            :loading="busy"
-            :disabled="loading"
+            :loading="creating"
+            :disabled="busy || loading"
             @click="() => openFileDialog()"
           >
             New
@@ -47,8 +58,18 @@ onChange(async (files) => {
       </div>
     </template>
 
-    <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="error" />
-    <p v-else-if="loading && documents.length === 0" class="text-sm text-muted">Loading...</p>
+    <UAlert
+      v-if="error"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-circle-alert"
+      :title="error"
+      close
+      class="mb-4"
+      @update:open="clearError"
+    />
+
+    <p v-if="loading && documents.length === 0" class="text-sm text-muted">Loading...</p>
     <p v-else-if="documents.length === 0" class="text-sm text-muted">No documents yet.</p>
 
     <ul v-else class="divide-y divide-default">
@@ -56,6 +77,7 @@ onChange(async (files) => {
         v-for="document in documents"
         :key="document.documentId"
         :document="document"
+        :deleting="deletingId === document.documentId"
         :disabled="busy"
         @delete="remove"
       />

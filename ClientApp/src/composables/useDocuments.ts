@@ -1,6 +1,7 @@
 import { computed, ref, shallowRef } from 'vue';
 import { useApi } from '@/api/client';
-import type { CollectionResponse, DocumentViewModel } from '@/api/documents';
+import type { DocumentViewModel } from '@/api/documents';
+import type { CollectionResponse } from '@/api/types';
 
 export function useDocuments() {
   const list = useApi('/documents').get().json<CollectionResponse<DocumentViewModel>>();
@@ -14,15 +15,22 @@ export function useDocuments() {
   const deleteUrl = computed(() => `/documents/${encodeURIComponent(deleteId.value)}`);
   const deleteRequest = useApi(deleteUrl, { immediate: false }).delete();
 
+  const deletingId = ref<string | null>(null);
   const actionError = ref<string | null>(null);
 
   const documents = computed(() => list.data.value?.items ?? []);
   const loading = computed(() => list.isFetching.value);
-  const busy = computed(() => createRequest.isFetching.value || deleteRequest.isFetching.value);
+  const creating = computed(() => createRequest.isFetching.value);
+  const busy = computed(() => creating.value || deletingId.value !== null);
   const error = computed<string | null>(() => actionError.value ?? list.error.value ?? null);
 
-  async function refresh(): Promise<void> {
+  function clearError(): void {
     actionError.value = null;
+    list.error.value = null;
+  }
+
+  async function refresh(): Promise<void> {
+    clearError();
     await list.execute();
   }
 
@@ -38,17 +46,28 @@ export function useDocuments() {
     await list.execute();
   }
 
-  function create(file: File): Promise<void> {
+  async function create(file: File): Promise<void> {
     const formData = new FormData();
     formData.append('file', file);
     createPayload.value = formData;
-    return mutate(createRequest);
+
+    try {
+      await mutate(createRequest);
+    } finally {
+      createPayload.value = null;
+    }
   }
 
-  function remove(documentId: string): Promise<void> {
+  async function remove(documentId: string): Promise<void> {
     deleteId.value = documentId;
-    return mutate(deleteRequest);
+    deletingId.value = documentId;
+
+    try {
+      await mutate(deleteRequest);
+    } finally {
+      deletingId.value = null;
+    }
   }
 
-  return { documents, loading, busy, error, refresh, create, remove };
+  return { documents, loading, creating, deletingId, busy, error, clearError, refresh, create, remove };
 }

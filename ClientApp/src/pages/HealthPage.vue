@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useHealth } from '@/composables/useHealth';
+import { formatDateTime } from '@/utils/format';
 
 const { health, error, loading, refresh } = useHealth();
 </script>
@@ -34,7 +35,7 @@ const { health, error, loading, refresh } = useHealth();
       </div>
       <div>
         <dt class="text-xs uppercase tracking-wide text-muted">Timestamp</dt>
-        <dd class="font-medium">{{ new Date(health.timestampUtc).toLocaleString() }}</dd>
+        <dd class="font-medium">{{ formatDateTime(health.timestampUtc) }}</dd>
       </div>
     </dl>
     <p v-else class="text-sm text-muted">Checking...</p>

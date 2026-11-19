@@ -1,9 +1,9 @@
 import { computed } from 'vue';
 import { useApi } from '@/api/client';
-import type { HealthResponse } from '@/api/health';
+import type { HealthViewModel } from '@/api/health';
 
 export function useHealth() {
-  const { data, error, isFetching, execute } = useApi('/health').get().json<HealthResponse>();
+  const { data, error, isFetching, execute } = useApi('/health').get().json<HealthViewModel>();
 
   return {
     health: data,

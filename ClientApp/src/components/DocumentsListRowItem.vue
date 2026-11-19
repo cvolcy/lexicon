@@ -5,9 +5,11 @@ import {
   type DocumentStatus,
   type DocumentViewModel,
 } from '@/api/documents';
+import { formatBytes, formatDateTime } from '@/utils/format';
 
 defineProps<{
   document: DocumentViewModel;
+  deleting?: boolean;
   disabled?: boolean;
 }>();
 
@@ -21,12 +23,6 @@ const statusColors: Record<DocumentStatus, BadgeProps['color']> = {
   Ready: 'success',
   Failed: 'error',
 };
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 </script>
 
 <template>
@@ -42,8 +38,8 @@ function formatSize(bytes: number): string {
         />
       </div>
       <div class="text-xs text-muted">
-        {{ formatSize(document.sizeBytes) }} · {{ document.contentType }} ·
-        {{ new Date(document.createdAt).toLocaleString() }}
+        {{ formatBytes(document.sizeBytes) }} · {{ document.contentType }} ·
+        {{ formatDateTime(document.createdAt) }}
       </div>
       <div v-if="document.error" class="text-xs text-error">{{ document.error }}</div>
     </div>
@@ -63,6 +59,7 @@ function formatSize(bytes: number): string {
         color="error"
         variant="ghost"
         size="sm"
+        :loading="deleting"
         :disabled="disabled"
         :aria-label="`Delete ${document.fileName}`"
         @click="emit('delete', document.documentId)"

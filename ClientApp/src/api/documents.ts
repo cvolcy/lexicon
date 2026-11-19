@@ -1,8 +1,3 @@
-export interface CollectionResponse<T> {
-  items: T[];
-  nextLink: string | null;
-}
-
 export type DocumentStatus = 'Pending' | 'Processing' | 'Ready' | 'Failed';
 
 export interface DocumentViewModel {
