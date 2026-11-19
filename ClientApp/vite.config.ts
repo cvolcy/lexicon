@@ -12,7 +12,7 @@ export default defineConfig({
       ui: {
         colors: {
           primary: 'emerald',
-          neutral: 'slate',
+          neutral: 'zinc',
         },
       },
       components: { dts: 'src/components.d.ts' },

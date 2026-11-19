@@ -11,8 +11,8 @@ const options: { value: ColorModePreference; label: string; icon: string }[] = [
   { value: 'dark', label: 'Dark', icon: 'i-lucide-moon' },
 ];
 
-const currentIcon = computed(
-  () => options.find((o) => o.value === colorMode.preference)?.icon ?? 'i-lucide-monitor',
+const currentOption = computed(
+  () => options.find((o) => o.value === colorMode.preference) ?? options[0]!,
 );
 
 const items = computed<DropdownMenuItem[]>(() =>
@@ -28,12 +28,14 @@ const items = computed<DropdownMenuItem[]>(() =>
 
 <template>
   <UDropdownMenu :items="items" :content="{ align: 'end' }">
-    <UButton
-      :icon="currentIcon"
-      color="neutral"
-      variant="ghost"
-      size="sm"
-      aria-label="Switch color mode"
-    />
+    <UTooltip :text="`Theme: ${currentOption.label}`">
+      <UButton
+        :icon="currentOption.icon"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        aria-label="Switch color mode"
+      />
+    </UTooltip>
   </UDropdownMenu>
 </template>

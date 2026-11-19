@@ -5,6 +5,8 @@ declare module 'vue-router' {
     /** Layout used to render the page. Defaults to `default`. */
     layout?: 'default';
     title?: string;
+    icon?: string;
+    description?: string;
   }
 }
 
@@ -15,25 +17,40 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: () => import('@/pages/HomePage.vue'),
-      meta: { title: 'Home' },
+      meta: {
+        title: 'Overview',
+        icon: 'i-lucide-layout-dashboard',
+        description: 'Workspace summary and recent documents',
+      },
     },
     {
       path: '/documents',
       name: 'documents',
       component: () => import('@/pages/DocumentsPage.vue'),
-      meta: { title: 'Documents' },
+      meta: {
+        title: 'Documents',
+        icon: 'i-lucide-files',
+        description: 'Upload, index, and manage your local knowledge base',
+      },
     },
     {
       path: '/health',
       name: 'health',
       component: () => import('@/pages/HealthPage.vue'),
-      meta: { title: 'Health' },
+      meta: {
+        title: 'System Health',
+        icon: 'i-lucide-activity',
+        description: 'Live diagnostics for database and document storage',
+      },
     },
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('@/pages/NotFoundPage.vue'),
-      meta: { title: 'Not found' },
+      meta: {
+        title: 'Not Found',
+        icon: 'i-lucide-search-x',
+      },
     },
   ],
 });

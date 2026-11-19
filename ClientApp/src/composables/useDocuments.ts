@@ -65,47 +65,51 @@ export function useDocuments() {
     await list.execute();
   }
 
-  async function mutate(request: { execute: () => Promise<unknown>; error: { value: unknown } }) {
+  async function mutate(request: {
+    execute: () => Promise<unknown>;
+    error: { value: unknown };
+  }): Promise<boolean> {
     actionError.value = null;
     await request.execute();
 
     if (request.error.value) {
       actionError.value = String(request.error.value);
-      return;
+      return false;
     }
 
     await list.execute();
+    return true;
   }
 
-  async function create(file: File): Promise<void> {
+  async function create(file: File): Promise<boolean> {
     const formData = new FormData();
     formData.append('file', file);
     createPayload.value = formData;
 
     try {
-      await mutate(createRequest);
+      return await mutate(createRequest);
     } finally {
       createPayload.value = null;
     }
   }
 
-  async function reindex(documentId: string): Promise<void> {
+  async function reindex(documentId: string): Promise<boolean> {
     reindexId.value = documentId;
     reindexingId.value = documentId;
 
     try {
-      await mutate(reindexRequest);
+      return await mutate(reindexRequest);
     } finally {
       reindexingId.value = null;
     }
   }
 
-  async function remove(documentId: string): Promise<void> {
+  async function remove(documentId: string): Promise<boolean> {
     deleteId.value = documentId;
     deletingId.value = documentId;
 
     try {
-      await mutate(deleteRequest);
+      return await mutate(deleteRequest);
     } finally {
       deletingId.value = null;
     }
@@ -118,6 +122,7 @@ export function useDocuments() {
     deletingId,
     reindexingId,
     busy,
+    hasInFlight,
     error,
     clearError,
     refresh,
