@@ -1,3 +1,4 @@
+using Lexicon.Infrastructure.Ingestion;
 using Lexicon.Infrastructure.Persistence;
 using Lexicon.Infrastructure.Storage;
 using Lexicon.Models.Documents;
@@ -8,6 +9,7 @@ namespace Lexicon.Services.Documents;
 public sealed class DocumentService(
     LexiconDbContext dbContext,
     IDocumentStorage documentStorage,
+    IIngestionQueue ingestionQueue,
     ILogger<DocumentService> logger) : IDocumentService
 {
     public async Task<IReadOnlyList<DocumentViewModel>> ListAsync(CancellationToken cancellationToken = default)
@@ -74,6 +76,8 @@ public sealed class DocumentService(
             throw;
         }
 
+        await ingestionQueue.EnqueueAsync(document.DocumentId, cancellationToken);
+
         return DocumentViewModel.From(document);
     }
 
@@ -99,6 +103,26 @@ public sealed class DocumentService(
         }
 
         return new DocumentDownloadResult(stream, document.ContentType, document.FileName);
+    }
+
+    public async Task<DocumentViewModel?> ReindexAsync(Guid documentId, CancellationToken cancellationToken = default)
+    {
+        var document = await dbContext.Documents
+            .SingleOrDefaultAsync(d => d.DocumentId == documentId, cancellationToken);
+
+        if (document is null)
+        {
+            return null;
+        }
+
+        document.Status = DocumentStatus.Pending;
+        document.Error = null;
+        document.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await ingestionQueue.EnqueueAsync(document.DocumentId, cancellationToken);
+
+        return DocumentViewModel.From(document);
     }
 
     public async Task<bool> DeleteAsync(Guid documentId, CancellationToken cancellationToken = default)

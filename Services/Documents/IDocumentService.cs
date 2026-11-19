@@ -17,5 +17,7 @@ public interface IDocumentService
 
     Task<DocumentDownloadResult?> OpenDownloadAsync(Guid documentId, CancellationToken cancellationToken = default);
 
+    Task<DocumentViewModel?> ReindexAsync(Guid documentId, CancellationToken cancellationToken = default);
+
     Task<bool> DeleteAsync(Guid documentId, CancellationToken cancellationToken = default);
 }

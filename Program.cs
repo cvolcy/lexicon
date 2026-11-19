@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using Lexicon.Infrastructure.Extraction;
+using Lexicon.Infrastructure.Ingestion;
 using Lexicon.Infrastructure.Persistence;
 using Lexicon.Infrastructure.Storage;
 using Lexicon.Services;
@@ -11,7 +13,9 @@ builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddLexiconDbContext(builder.Configuration);
 builder.Services.AddLexiconDocumentStorage(builder.Configuration);
-builder.Services.AddLexiconServices();
+builder.Services.AddLexiconDocumentExtractors();
+builder.Services.AddLexiconIngestionQueue(builder.Configuration);
+builder.Services.AddLexiconServices(builder.Configuration);
 
 var app = builder.Build();
 
