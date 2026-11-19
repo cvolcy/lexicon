@@ -3,6 +3,7 @@ using Lexicon.Infrastructure.Ai;
 using Lexicon.Infrastructure.Extraction;
 using Lexicon.Infrastructure.Ingestion;
 using Lexicon.Infrastructure.Persistence;
+using Lexicon.Infrastructure.Retrieval;
 using Lexicon.Infrastructure.Storage;
 using Lexicon.Services;
 
@@ -17,6 +18,7 @@ builder.Services.AddLexiconDocumentStorage(builder.Configuration);
 builder.Services.AddLexiconDocumentExtractors();
 builder.Services.AddLexiconIngestionQueue(builder.Configuration);
 builder.Services.AddLexiconAi(builder.Configuration);
+builder.Services.AddLexiconSearchIndexes(builder.Configuration);
 builder.Services.AddLexiconServices(builder.Configuration);
 
 var app = builder.Build();

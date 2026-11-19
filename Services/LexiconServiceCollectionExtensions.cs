@@ -1,5 +1,6 @@
 using Lexicon.Services.Documents;
 using Lexicon.Services.Ingestion;
+using Lexicon.Services.Retrieval;
 
 namespace Lexicon.Services;
 
@@ -11,6 +12,7 @@ public static class LexiconServiceCollectionExtensions
     {
         services.AddLexiconDocumentServices(configuration);
         services.AddLexiconIngestionServices(configuration);
+        services.AddLexiconRetrievalServices(configuration);
         return services;
     }
 
@@ -48,6 +50,30 @@ public static class LexiconServiceCollectionExtensions
 
         services.AddSingleton<IChunker, RecursiveTextChunker>();
         services.AddScoped<IDocumentIngestionProcessor, DocumentIngestionProcessor>();
+        return services;
+    }
+
+    private static IServiceCollection AddLexiconRetrievalServices(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddOptions<RetrievalOptions>()
+            .Bind(configuration.GetSection(RetrievalOptions.SectionName))
+            .Validate(
+                o => o.DefaultTopK > 0,
+                $"{RetrievalOptions.SectionName}:DefaultTopK must be greater than 0.")
+            .Validate(
+                o => o.MaxTopK >= o.DefaultTopK,
+                $"{RetrievalOptions.SectionName}:MaxTopK must be greater than or equal to DefaultTopK.")
+            .Validate(
+                o => o.RrfK > 0,
+                $"{RetrievalOptions.SectionName}:RrfK must be greater than 0.")
+            .Validate(
+                o => o.CandidateMultiplier > 0,
+                $"{RetrievalOptions.SectionName}:CandidateMultiplier must be greater than 0.")
+            .ValidateOnStart();
+
+        services.AddScoped<IRetriever, HybridRetriever>();
         return services;
     }
 }

@@ -1,8 +1,11 @@
+using Lexicon.Infrastructure.Ai;
 using Lexicon.Infrastructure.Extraction;
 using Lexicon.Infrastructure.Persistence;
+using Lexicon.Infrastructure.Retrieval;
 using Lexicon.Infrastructure.Storage;
 using Lexicon.Models.Documents;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 
 namespace Lexicon.Services.Ingestion;
 
@@ -11,9 +14,14 @@ public sealed class DocumentIngestionProcessor(
     IDocumentStorage documentStorage,
     IEnumerable<IDocumentTextExtractor> extractors,
     IChunker chunker,
+    IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+    AiModelInfo aiModelInfo,
+    IVectorStore vectorStore,
+    IKeywordIndex keywordIndex,
     ILogger<DocumentIngestionProcessor> logger) : IDocumentIngestionProcessor
 {
     private const int MaxErrorLength = 2000;
+    private const int EmbeddingBatchSize = 32;
 
     public async Task ProcessAsync(Guid documentId, CancellationToken cancellationToken = default)
     {
@@ -59,7 +67,12 @@ public sealed class DocumentIngestionProcessor(
                 return;
             }
 
+            var embeddings = await GenerateEmbeddingsAsync(chunks, cancellationToken);
+
             await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            await vectorStore.DeleteByDocumentAsync(documentId, cancellationToken);
+            await keywordIndex.DeleteByDocumentAsync(documentId, cancellationToken);
 
             await dbContext.DocumentChunks
                 .Where(c => c.DocumentId == documentId)
@@ -74,11 +87,28 @@ public sealed class DocumentIngestionProcessor(
                 PageNumber = chunk.PageNumber,
                 Section = chunk.Section,
                 TokenCount = chunk.TokenCount,
-            });
+            }).ToList();
 
             dbContext.DocumentChunks.AddRange(chunkEntities);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
-            document.ChunkCount = chunks.Count;
+            var vectorRecords = chunkEntities
+                .Zip(embeddings, (chunk, vector) => new ChunkVectorRecord(
+                    chunk.ChunkId,
+                    documentId,
+                    vector,
+                    aiModelInfo.EmbeddingModel))
+                .ToList();
+
+            await vectorStore.UpsertAsync(vectorRecords, cancellationToken);
+
+            var indexedChunks = chunkEntities
+                .Select(chunk => new IndexedChunkRecord(chunk.ChunkId, documentId, chunk.Text))
+                .ToList();
+
+            await keywordIndex.IndexAsync(indexedChunks, cancellationToken);
+
+            document.ChunkCount = chunkEntities.Count;
             document.Status = DocumentStatus.Ready;
             document.Error = null;
             document.UpdatedAt = DateTimeOffset.UtcNow;
@@ -87,10 +117,11 @@ public sealed class DocumentIngestionProcessor(
             await transaction.CommitAsync(cancellationToken);
 
             logger.LogInformation(
-                "Ingested document {DocumentId} ({FileName}) into {ChunkCount} chunk(s).",
+                "Ingested document {DocumentId} ({FileName}) into {ChunkCount} chunk(s) using embedding model '{EmbeddingModel}'.",
                 documentId,
                 document.FileName,
-                chunks.Count);
+                chunkEntities.Count,
+                aiModelInfo.EmbeddingModel);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -101,6 +132,32 @@ public sealed class DocumentIngestionProcessor(
             logger.LogWarning(ex, "Ingestion failed for document {DocumentId} ({FileName}).", documentId, document.FileName);
             await MarkFailedAsync(documentId, ex.Message, CancellationToken.None);
         }
+    }
+
+    private async Task<List<ReadOnlyMemory<float>>> GenerateEmbeddingsAsync(
+        IReadOnlyList<TextChunk> chunks,
+        CancellationToken cancellationToken)
+    {
+        var vectors = new List<ReadOnlyMemory<float>>(chunks.Count);
+
+        foreach (var batch in chunks.Chunk(EmbeddingBatchSize))
+        {
+            var inputs = batch.Select(c => c.Text).ToList();
+            var generated = await embeddingGenerator.GenerateAsync(inputs, cancellationToken: cancellationToken);
+
+            if (generated.Count != inputs.Count)
+            {
+                throw new InvalidOperationException(
+                    $"Embedding generator returned {generated.Count} vector(s) for {inputs.Count} chunk(s).");
+            }
+
+            foreach (var embedding in generated)
+            {
+                vectors.Add(embedding.Vector);
+            }
+        }
+
+        return vectors;
     }
 
     private async Task MarkFailedAsync(Guid documentId, string reason, CancellationToken cancellationToken)
