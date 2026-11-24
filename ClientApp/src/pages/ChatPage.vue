@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import type { CitationViewModel } from '@/api/chat';
-import { isPreviewChatMode } from '@/api/chatClient';
 import ChatCitationSlideover from '@/components/ChatCitationSlideover.vue';
 import ChatConversationSidebar from '@/components/ChatConversationSidebar.vue';
 import ChatHealthBanner from '@/components/ChatHealthBanner.vue';
@@ -152,12 +151,6 @@ function handleNewConversation(): void {
             <h1 class="truncate text-sm font-semibold text-highlighted">
               {{ activeConversation?.title ?? 'New Conversation' }}
             </h1>
-            <UTooltip
-              v-if="isPreviewChatMode"
-              text="Uses /api/search for real retrieved passages until Phase 4 chat API is wired."
-            >
-              <UBadge label="Preview Mode" color="info" variant="subtle" size="xs" />
-            </UTooltip>
           </div>
 
           <div class="flex items-center gap-2">

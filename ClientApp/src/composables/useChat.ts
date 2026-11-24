@@ -182,6 +182,9 @@ export function useChat() {
             }
             case 'error':
               error.value = event.message;
+              if (!target.content) {
+                messages.value = messages.value.filter((m) => m.messageId !== assistantId);
+              }
               break;
           }
         },

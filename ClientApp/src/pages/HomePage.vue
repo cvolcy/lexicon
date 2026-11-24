@@ -67,8 +67,8 @@ const pipelineStages: {
   {
     name: 'Cited Chat',
     description: 'Streaming grounded Q&A over SSE',
-    status: 'Preview UI',
-    color: 'info',
+    status: 'Active',
+    color: 'success',
     icon: 'i-lucide-sparkles',
   },
 ];
