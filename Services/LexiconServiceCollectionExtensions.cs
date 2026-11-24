@@ -1,3 +1,4 @@
+using Lexicon.Services.Chat;
 using Lexicon.Services.Documents;
 using Lexicon.Services.Ingestion;
 using Lexicon.Services.Retrieval;
@@ -13,6 +14,7 @@ public static class LexiconServiceCollectionExtensions
         services.AddLexiconDocumentServices(configuration);
         services.AddLexiconIngestionServices(configuration);
         services.AddLexiconRetrievalServices(configuration);
+        services.AddLexiconChatServices(configuration);
         return services;
     }
 
@@ -74,6 +76,37 @@ public static class LexiconServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddScoped<IRetriever, HybridRetriever>();
+        return services;
+    }
+
+    private static IServiceCollection AddLexiconChatServices(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddOptions<RagChatOptions>()
+            .Bind(configuration.GetSection(RagChatOptions.SectionName))
+            .Validate(
+                o => o.RetrievalTopK > 0,
+                $"{RagChatOptions.SectionName}:RetrievalTopK must be greater than 0.")
+            .Validate(
+                o => o.MaxHistoryMessages >= 0,
+                $"{RagChatOptions.SectionName}:MaxHistoryMessages must be greater than or equal to 0.")
+            .Validate(
+                o => o.MaxHistoryTokens >= 0,
+                $"{RagChatOptions.SectionName}:MaxHistoryTokens must be greater than or equal to 0.")
+            .Validate(
+                o => o.MaxContextTokens > 0,
+                $"{RagChatOptions.SectionName}:MaxContextTokens must be greater than 0.")
+            .Validate(
+                o => o.MaxMessageLength > 0,
+                $"{RagChatOptions.SectionName}:MaxMessageLength must be greater than 0.")
+            .Validate(
+                o => o.Temperature is >= 0f and <= 2f,
+                $"{RagChatOptions.SectionName}:Temperature must be between 0 and 2.")
+            .ValidateOnStart();
+
+        services.AddSingleton<IPromptBuilder, PromptBuilder>();
+        services.AddScoped<IChatService, ChatService>();
         return services;
     }
 }

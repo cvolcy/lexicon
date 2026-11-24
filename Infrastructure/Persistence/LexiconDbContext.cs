@@ -1,3 +1,4 @@
+using Lexicon.Models.Chat;
 using Lexicon.Models.Documents;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +11,10 @@ public class LexiconDbContext(DbContextOptions<LexiconDbContext> options) : DbCo
     public DbSet<DocumentChunk> DocumentChunks => Set<DocumentChunk>();
 
     public DbSet<ChunkVector> ChunkVectors => Set<ChunkVector>();
+
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+
+    public DbSet<ConversationMessage> ConversationMessages => Set<ConversationMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

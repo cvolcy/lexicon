@@ -17,6 +17,59 @@ namespace Lexicon.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
+            modelBuilder.Entity("Lexicon.Models.Chat.Conversation", b =>
+                {
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("ConversationId");
+
+                    b.HasIndex("UpdatedAt");
+
+                    b.ToTable("Conversations", (string)null);
+                });
+
+            modelBuilder.Entity("Lexicon.Models.Chat.ConversationMessage", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CitationsJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("MessageId");
+
+                    b.HasIndex("ConversationId", "CreatedAt");
+
+                    b.ToTable("ConversationMessages", (string)null);
+                });
+
             modelBuilder.Entity("Lexicon.Models.Documents.ChunkVector", b =>
                 {
                     b.Property<Guid>("ChunkId")
@@ -131,6 +184,17 @@ namespace Lexicon.Infrastructure.Persistence.Migrations
                     b.ToTable("DocumentChunks", (string)null);
                 });
 
+            modelBuilder.Entity("Lexicon.Models.Chat.ConversationMessage", b =>
+                {
+                    b.HasOne("Lexicon.Models.Chat.Conversation", "Conversation")
+                        .WithMany("Messages")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Conversation");
+                });
+
             modelBuilder.Entity("Lexicon.Models.Documents.ChunkVector", b =>
                 {
                     b.HasOne("Lexicon.Models.Documents.DocumentChunk", "Chunk")
@@ -151,6 +215,11 @@ namespace Lexicon.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Document");
+                });
+
+            modelBuilder.Entity("Lexicon.Models.Chat.Conversation", b =>
+                {
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("Lexicon.Models.Documents.Document", b =>
