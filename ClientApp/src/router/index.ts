@@ -24,6 +24,16 @@ const router = createRouter({
       },
     },
     {
+      path: '/chat',
+      name: 'chat',
+      component: () => import('@/pages/ChatPage.vue'),
+      meta: {
+        title: 'Chat',
+        icon: 'i-lucide-message-square-text',
+        description: 'Ask questions grounded in your documents with inline citations',
+      },
+    },
+    {
       path: '/documents',
       name: 'documents',
       component: () => import('@/pages/DocumentsPage.vue'),

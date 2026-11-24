@@ -67,8 +67,8 @@ const pipelineStages: {
   {
     name: 'Cited Chat',
     description: 'Streaming grounded Q&A over SSE',
-    status: 'Next',
-    color: 'neutral',
+    status: 'Preview UI',
+    color: 'info',
     icon: 'i-lucide-sparkles',
   },
 ];
@@ -99,7 +99,10 @@ const pipelineStages: {
         </div>
 
         <div class="flex flex-wrap gap-2.5 pt-1">
-          <UButton to="/documents" icon="i-lucide-files">Manage Documents</UButton>
+          <UButton to="/chat" icon="i-lucide-message-square-text">Ask Lexicon</UButton>
+          <UButton to="/documents" icon="i-lucide-files" color="neutral" variant="soft">
+            Manage Documents
+          </UButton>
           <UButton to="/search" icon="i-lucide-search" color="neutral" variant="soft">
             Search Knowledge Base
           </UButton>

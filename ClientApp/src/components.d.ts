@@ -11,6 +11,11 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ChatCitationSlideover: typeof import('./components/ChatCitationSlideover.vue')['default']
+    ChatConversationSidebar: typeof import('./components/ChatConversationSidebar.vue')['default']
+    ChatHealthBanner: typeof import('./components/ChatHealthBanner.vue')['default']
+    ChatMessageBubble: typeof import('./components/ChatMessageBubble.vue')['default']
+    ChatMessageContent: typeof import('./components/ChatMessageContent.vue')['default']
     ColorModeSwitcher: typeof import('./components/ColorModeSwitcher.vue')['default']
     DocumentsList: typeof import('./components/DocumentsList.vue')['default']
     DocumentsListRowItem: typeof import('./components/DocumentsListRowItem.vue')['default']
@@ -22,6 +27,7 @@ declare module 'vue' {
     UBadge: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/Badge.vue')['default']
     UButton: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/Button.vue')['default']
     UCard: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/Card.vue')['default']
+    UChatPrompt: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/ChatPrompt.vue')['default']
     UDashboardGroup: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/DashboardGroup.vue')['default']
     UDashboardNavbar: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/DashboardNavbar.vue')['default']
     UDashboardPanel: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/DashboardPanel.vue')['default']
@@ -34,6 +40,7 @@ declare module 'vue' {
     UNavigationMenu: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/NavigationMenu.vue')['default']
     USelect: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/Select.vue')['default']
     USkeleton: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/Skeleton.vue')['default']
+    USlideover: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/Slideover.vue')['default']
     UTooltip: typeof import('./../node_modules/@nuxt/ui/dist/runtime/components/Tooltip.vue')['default']
   }
 }
