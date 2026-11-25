@@ -77,7 +77,7 @@ const pipelineStages: {
 <template>
   <div class="space-y-6">
     <section
-      class="relative overflow-hidden rounded-xl border border-default bg-gradient-to-br from-primary/10 via-default to-default p-6 sm:p-8"
+      class="relative flex flex-wrap justify-between overflow-hidden rounded-xl border border-default bg-gradient-to-br from-primary/10 via-default to-default p-6 sm:p-8"
     >
       <div class="max-w-2xl space-y-4">
         <UBadge
@@ -97,7 +97,7 @@ const pipelineStages: {
             Everything stays on your machine.
           </p>
         </div>
-
+        
         <div class="flex flex-wrap gap-2.5 pt-1">
           <UButton to="/chat" icon="i-lucide-message-square-text">Ask Lexicon</UButton>
           <UButton to="/documents" icon="i-lucide-files" color="neutral" variant="soft">
@@ -110,6 +110,9 @@ const pipelineStages: {
             System Health
           </UButton>
         </div>
+      </div>
+      <div class="max-w-40 min-w-20">
+        <img src="@/assets/mascot/10-i-c/main.png" alt="Lexicon Mascot" class="w-full" />
       </div>
     </section>
 
