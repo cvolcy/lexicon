@@ -21,9 +21,7 @@ public class SearchController(IRetriever retriever) : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var filter = request.DocumentIds is { Count: > 0 }
-            ? new SearchFilter(request.DocumentIds)
-            : null;
+        var filter = SearchFilter.From(request.DocumentIds);
 
         var results = await retriever.RetrieveAsync(
             request.Query.Trim(),

@@ -17,8 +17,8 @@ public sealed class OllamaHealthCheck(
 
         try
         {
-            var httpClient = httpClientFactory.CreateClient(AiServiceCollectionExtensions.OllamaHealthCheckHttpClientName);
-            var client = new OllamaApiClient(httpClient);
+            using var httpClient = httpClientFactory.CreateClient(AiServiceCollectionExtensions.OllamaHealthCheckHttpClientName);
+            using var client = new OllamaApiClient(httpClient);
             var models = await client.ListLocalModelsAsync(cancellationToken);
 
             var availableNames = models

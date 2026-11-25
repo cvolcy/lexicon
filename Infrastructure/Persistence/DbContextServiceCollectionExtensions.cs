@@ -8,6 +8,8 @@ public static class DbContextServiceCollectionExtensions
     public const string ConnectionStringName = "Lexicon";
     public const string ProviderConfigurationKey = "Database:Provider";
 
+    private static readonly SqlitePragmaConnectionInterceptor SqlitePragmaInterceptor = new();
+
     /// <summary>
     /// Registers <see cref="LexiconDbContext"/> using the provider selected by
     /// <c>Database:Provider</c> (defaults to <see cref="DatabaseProvider.Sqlite"/>) and the
@@ -42,7 +44,8 @@ public static class DbContextServiceCollectionExtensions
     {
         EnsureSqliteDirectoryExists(connectionString);
 
-        services.AddDbContext<LexiconDbContext>(options => options.UseSqlite(connectionString));
+        services.AddDbContext<LexiconDbContext>(options =>
+            options.UseSqlite(connectionString).AddInterceptors(SqlitePragmaInterceptor));
     }
 
     private static void EnsureSqliteDirectoryExists(string connectionString)

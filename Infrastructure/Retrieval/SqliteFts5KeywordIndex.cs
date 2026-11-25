@@ -13,6 +13,8 @@ namespace Lexicon.Infrastructure.Retrieval;
 /// </summary>
 public sealed partial class SqliteFts5KeywordIndex(LexiconDbContext dbContext) : IKeywordIndex
 {
+    private const int MaxQueryTokens = 24;
+
     [GeneratedRegex(@"[\p{L}\p{N}]+", RegexOptions.CultureInvariant)]
     private static partial Regex TokenRegex();
 
@@ -96,18 +98,25 @@ public sealed partial class SqliteFts5KeywordIndex(LexiconDbContext dbContext) :
 
     private static string? BuildFtsQuery(string query)
     {
-        var tokens = TokenRegex()
+        var distinctTokens = TokenRegex()
             .Matches(query)
             .Select(m => m.Value)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (tokens.Count == 0)
+        if (distinctTokens.Count == 0)
         {
             return null;
         }
 
-        return string.Join(" OR ", tokens.Select(t => $"\"{t}\""));
+        var hasMultiCharToken = distinctTokens.Any(t => t.Length >= 2);
+        var selectedTokens = (hasMultiCharToken
+                ? distinctTokens.Where(t => t.Length >= 2)
+                : distinctTokens)
+            .Take(MaxQueryTokens)
+            .ToList();
+
+        return string.Join(" OR ", selectedTokens.Select(t => $"\"{t}\""));
     }
 
     private sealed class FtsMatchRow

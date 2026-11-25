@@ -46,3 +46,5 @@ app.MapFallback("/api/{**slug}", () => TypedResults.NotFound());
 app.MapFallbackToFile("index.html");
 
 app.Run();
+
+public partial class Program;

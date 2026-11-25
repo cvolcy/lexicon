@@ -38,15 +38,12 @@ public sealed class RecursiveTextChunker(IOptions<ChunkingOptions> options) : IC
                     Text: chunkText,
                     PageNumber: segment.PageNumber,
                     Section: segment.Section,
-                    TokenCount: EstimateTokens(chunkText)));
+                    TokenCount: TokenEstimator.Estimate(chunkText)));
             }
         }
 
         return chunks;
     }
-
-    private static int EstimateTokens(string text)
-        => string.IsNullOrWhiteSpace(text) ? 0 : (int)Math.Ceiling(text.Length / 4.0);
 
     private static void SplitToPieces(
         string text,
@@ -62,7 +59,7 @@ public sealed class RecursiveTextChunker(IOptions<ChunkingOptions> options) : IC
             return;
         }
 
-        if (EstimateTokens(trimmed) <= maxTokens)
+        if (TokenEstimator.Estimate(trimmed) <= maxTokens)
         {
             output.Add((trimmed, defaultJoiner));
             return;
@@ -107,7 +104,7 @@ public sealed class RecursiveTextChunker(IOptions<ChunkingOptions> options) : IC
                 part += ".";
             }
 
-            if (EstimateTokens(part) <= maxTokens)
+            if (TokenEstimator.Estimate(part) <= maxTokens)
             {
                 output.Add((part, joiner));
             }
@@ -136,7 +133,7 @@ public sealed class RecursiveTextChunker(IOptions<ChunkingOptions> options) : IC
 
             var separator = joiner.Length > 0 ? joiner : " ";
             var candidateLength = builder.Length + separator.Length + text.Length;
-            if ((int)Math.Ceiling(candidateLength / 4.0) <= maxTokens)
+            if (TokenEstimator.Estimate(candidateLength) <= maxTokens)
             {
                 builder.Append(separator).Append(text);
                 continue;
@@ -154,7 +151,7 @@ public sealed class RecursiveTextChunker(IOptions<ChunkingOptions> options) : IC
             {
                 var overlap = ExtractOverlapSuffix(completed, overlapChars);
                 if (overlap.Length > 0
-                    && EstimateTokens(overlap + "\n" + text) <= maxTokens)
+                    && TokenEstimator.Estimate(overlap + "\n" + text) <= maxTokens)
                 {
                     builder.Append(overlap).Append('\n').Append(text);
                     continue;
