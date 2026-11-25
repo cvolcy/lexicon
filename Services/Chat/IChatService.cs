@@ -16,9 +16,7 @@ public interface IChatService
 
     Task<bool> DeleteConversationAsync(Guid conversationId, CancellationToken cancellationToken = default);
 
-    Task<bool> ConversationExistsAsync(Guid conversationId, CancellationToken cancellationToken = default);
-
-    IAsyncEnumerable<ChatStreamEvent> StreamReplyAsync(
+    Task<IAsyncEnumerable<ChatStreamEvent>?> StartReplyStreamAsync(
         Guid conversationId,
         string content,
         IReadOnlyList<Guid>? documentIds = null,

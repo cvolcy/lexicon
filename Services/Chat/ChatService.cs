@@ -9,6 +9,7 @@ using Lexicon.Services.Retrieval;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
+using AiChatMessage = Microsoft.Extensions.AI.ChatMessage;
 using AiChatOptions = Microsoft.Extensions.AI.ChatOptions;
 
 namespace Lexicon.Services.Chat;
@@ -19,14 +20,15 @@ public sealed partial class ChatService(
     IPromptBuilder promptBuilder,
     IChatClient chatClient,
     IOptions<RagChatOptions> options,
+    TimeProvider timeProvider,
     ILogger<ChatService> logger) : IChatService
 {
-    private const string DefaultTitle = "New conversation";
-    private const int MaxTitleLength = 200;
     private const int AutoTitleMaxLength = 60;
 
     private const string NoRelevantPassagesReply =
         "I couldn't find any relevant passages in your indexed documents to answer that question. Try rephrasing your question, clearing any document filters, or uploading relevant documents first.";
+
+    private const string EmptyModelResponseReply = "The AI model returned an empty response.";
 
     private static readonly JsonSerializerOptions CitationsJsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -96,7 +98,7 @@ public sealed partial class ChatService(
         string? title = null,
         CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var conversation = new Conversation
         {
             ConversationId = Guid.CreateVersion7(),
@@ -133,28 +135,18 @@ public sealed partial class ChatService(
         return true;
     }
 
-    public async Task<bool> ConversationExistsAsync(
-        Guid conversationId,
-        CancellationToken cancellationToken = default)
-    {
-        return await dbContext.Conversations
-            .AsNoTracking()
-            .AnyAsync(c => c.ConversationId == conversationId, cancellationToken);
-    }
-
-    public async IAsyncEnumerable<ChatStreamEvent> StreamReplyAsync(
+    public async Task<IAsyncEnumerable<ChatStreamEvent>?> StartReplyStreamAsync(
         Guid conversationId,
         string content,
         IReadOnlyList<Guid>? documentIds = null,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default)
     {
         var conversation = await dbContext.Conversations
             .SingleOrDefaultAsync(c => c.ConversationId == conversationId, cancellationToken);
 
         if (conversation is null)
         {
-            yield return new ErrorChatStreamEvent("Conversation not found.");
-            yield break;
+            return null;
         }
 
         var priorMessages = await dbContext.ConversationMessages
@@ -165,17 +157,28 @@ public sealed partial class ChatService(
             .ToListAsync(cancellationToken);
 
         var trimmedContent = content.Trim();
-        var userTimestamp = DateTimeOffset.UtcNow;
+        await RecordUserMessageAsync(conversation, trimmedContent, priorMessages.Count == 0, cancellationToken);
+
+        return StreamAssistantReplyAsync(conversation, trimmedContent, priorMessages, documentIds);
+    }
+
+    private async Task RecordUserMessageAsync(
+        Conversation conversation,
+        string trimmedContent,
+        bool isFirstTurn,
+        CancellationToken cancellationToken)
+    {
+        var userTimestamp = timeProvider.GetUtcNow();
         var userMessage = new ConversationMessage
         {
             MessageId = Guid.CreateVersion7(),
-            ConversationId = conversationId,
+            ConversationId = conversation.ConversationId,
             Role = ConversationMessageRole.User,
             Content = trimmedContent,
             CreatedAt = userTimestamp,
         };
 
-        if (priorMessages.Count == 0 && string.Equals(conversation.Title, DefaultTitle, StringComparison.Ordinal))
+        if (isFirstTurn && string.Equals(conversation.Title, Conversation.DefaultTitle, StringComparison.Ordinal))
         {
             conversation.Title = SummarizeTitle(trimmedContent);
         }
@@ -183,46 +186,36 @@ public sealed partial class ChatService(
         conversation.UpdatedAt = userTimestamp;
         dbContext.ConversationMessages.Add(userMessage);
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
 
+    private async IAsyncEnumerable<ChatStreamEvent> StreamAssistantReplyAsync(
+        Conversation conversation,
+        string trimmedContent,
+        IReadOnlyList<ConversationMessage> priorMessages,
+        IReadOnlyList<Guid>? documentIds,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
         var opts = options.Value;
-        var filter = documentIds is { Count: > 0 } ? new SearchFilter(documentIds) : null;
+        var retrieval = await TryRetrieveContextAsync(
+            conversation.ConversationId,
+            trimmedContent,
+            opts.RetrievalTopK,
+            documentIds,
+            cancellationToken);
 
-        IReadOnlyList<RetrievedChunk> retrievedChunks = [];
-        string? retrievalError = null;
-        try
-        {
-            retrievedChunks = await retriever.RetrieveAsync(
-                trimmedContent,
-                opts.RetrievalTopK,
-                filter,
-                cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        if (retrieval.Cancelled)
         {
             yield break;
         }
-        catch (Exception ex)
-        {
-            logger.LogError(
-                ex,
-                "Failed to retrieve context passages for conversation {ConversationId}.",
-                conversationId);
-            retrievalError = "Failed to retrieve document passages. Verify the AI embedding provider is reachable on System Health.";
-        }
 
-        if (retrievalError is not null)
+        if (retrieval.ErrorMessage is not null)
         {
-            yield return new ErrorChatStreamEvent(retrievalError);
+            yield return new ErrorChatStreamEvent(retrieval.ErrorMessage);
             yield break;
         }
 
-        var prompt = promptBuilder.Build(trimmedContent, priorMessages, retrievedChunks);
-
-        if (prompt.Citations.Count > 0)
-        {
-            yield return new CitationsChatStreamEvent(prompt.Citations);
-        }
-        else
+        var prompt = promptBuilder.Build(trimmedContent, priorMessages, retrieval.Chunks);
+        if (prompt.Citations.Count == 0)
         {
             yield return new TokenChatStreamEvent(NoRelevantPassagesReply);
             var fallbackMessage = await SaveAssistantMessageAsync(
@@ -234,50 +227,42 @@ public sealed partial class ChatService(
             yield break;
         }
 
+        yield return new CitationsChatStreamEvent(prompt.Citations);
+
+        var streamOpen = TryOpenModelStream(
+            conversation.ConversationId,
+            prompt.Messages,
+            opts.Temperature,
+            cancellationToken);
+
+        if (streamOpen.Cancelled)
+        {
+            yield break;
+        }
+
+        if (streamOpen.ErrorMessage is not null)
+        {
+            yield return new ErrorChatStreamEvent(streamOpen.ErrorMessage);
+            yield break;
+        }
+
+        if (streamOpen.Enumerator is null)
+        {
+            yield break;
+        }
+
         var contentBuilder = new StringBuilder();
-        var chatOptions = new AiChatOptions { Temperature = opts.Temperature };
         string? streamError = null;
         var cancelled = false;
 
-        IAsyncEnumerator<ChatResponseUpdate>? enumerator = null;
-        try
-        {
-            enumerator = chatClient
-                .GetStreamingResponseAsync(prompt.Messages, chatOptions, cancellationToken)
-                .GetAsyncEnumerator(cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            cancelled = true;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(
-                ex,
-                "Failed to start chat response stream for conversation {ConversationId}.",
-                conversationId);
-            streamError = "Failed to start AI response stream. Verify Ollama is reachable and the chat model is available.";
-        }
-
-        if (streamError is not null)
-        {
-            yield return new ErrorChatStreamEvent(streamError);
-            yield break;
-        }
-
-        if (cancelled || enumerator is null)
-        {
-            yield break;
-        }
-
-        await using (enumerator)
+        await using (streamOpen.Enumerator)
         {
             while (true)
             {
                 bool hasNext;
                 try
                 {
-                    hasNext = await enumerator.MoveNextAsync();
+                    hasNext = await streamOpen.Enumerator.MoveNextAsync();
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -289,7 +274,7 @@ public sealed partial class ChatService(
                     logger.LogError(
                         ex,
                         "Chat response streaming failed for conversation {ConversationId}.",
-                        conversationId);
+                        conversation.ConversationId);
                     streamError = "AI response streaming failed. Verify Ollama is running and the chat model is available.";
                     break;
                 }
@@ -299,7 +284,7 @@ public sealed partial class ChatService(
                     break;
                 }
 
-                var tokenText = enumerator.Current.Text;
+                var tokenText = streamOpen.Enumerator.Current.Text;
                 if (!string.IsNullOrEmpty(tokenText))
                 {
                     contentBuilder.Append(tokenText);
@@ -330,7 +315,7 @@ public sealed partial class ChatService(
 
         var finalContent = contentBuilder.Length > 0
             ? contentBuilder.ToString()
-            : "The AI model returned an empty response.";
+            : EmptyModelResponseReply;
 
         if (contentBuilder.Length == 0)
         {
@@ -346,13 +331,75 @@ public sealed partial class ChatService(
         yield return new DoneChatStreamEvent(assistantMessage);
     }
 
+    private async Task<RetrievalAttempt> TryRetrieveContextAsync(
+        Guid conversationId,
+        string query,
+        int topK,
+        IReadOnlyList<Guid>? documentIds,
+        CancellationToken cancellationToken)
+    {
+        var filter = SearchFilter.From(documentIds);
+
+        try
+        {
+            var chunks = await retriever.RetrieveAsync(query, topK, filter, cancellationToken);
+            return new RetrievalAttempt(chunks, ErrorMessage: null, Cancelled: false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return new RetrievalAttempt([], ErrorMessage: null, Cancelled: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Failed to retrieve context passages for conversation {ConversationId}.",
+                conversationId);
+            return new RetrievalAttempt(
+                [],
+                "Failed to retrieve document passages. Verify the AI embedding provider is reachable on System Health.",
+                Cancelled: false);
+        }
+    }
+
+    private StreamOpenAttempt TryOpenModelStream(
+        Guid conversationId,
+        IReadOnlyList<AiChatMessage> messages,
+        float temperature,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var enumerator = chatClient
+                .GetStreamingResponseAsync(messages, new AiChatOptions { Temperature = temperature }, cancellationToken)
+                .GetAsyncEnumerator(cancellationToken);
+
+            return new StreamOpenAttempt(enumerator, ErrorMessage: null, Cancelled: false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return new StreamOpenAttempt(null, ErrorMessage: null, Cancelled: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Failed to start chat response stream for conversation {ConversationId}.",
+                conversationId);
+            return new StreamOpenAttempt(
+                null,
+                "Failed to start AI response stream. Verify Ollama is reachable and the chat model is available.",
+                Cancelled: false);
+        }
+    }
+
     private async Task<ChatMessageViewModel> SaveAssistantMessageAsync(
         Conversation conversation,
         string content,
         IReadOnlyList<CitationViewModel> citations,
         CancellationToken cancellationToken)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var citationsJson = citations.Count > 0
             ? JsonSerializer.Serialize(citations, CitationsJsonOptions)
             : null;
@@ -402,11 +449,13 @@ public sealed partial class ChatService(
     {
         if (string.IsNullOrWhiteSpace(title))
         {
-            return DefaultTitle;
+            return Conversation.DefaultTitle;
         }
 
         var trimmed = title.Trim();
-        return trimmed.Length <= MaxTitleLength ? trimmed : trimmed[..MaxTitleLength];
+        return trimmed.Length <= Conversation.MaxTitleLength
+            ? trimmed
+            : trimmed[..Conversation.MaxTitleLength];
     }
 
     private static string SummarizeTitle(string prompt)
@@ -414,7 +463,7 @@ public sealed partial class ChatService(
         var collapsed = WhitespaceRegex().Replace(prompt, " ").Trim();
         if (string.IsNullOrEmpty(collapsed))
         {
-            return DefaultTitle;
+            return Conversation.DefaultTitle;
         }
 
         return collapsed.Length <= AutoTitleMaxLength
@@ -424,4 +473,14 @@ public sealed partial class ChatService(
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex WhitespaceRegex();
+
+    private sealed record RetrievalAttempt(
+        IReadOnlyList<RetrievedChunk> Chunks,
+        string? ErrorMessage,
+        bool Cancelled);
+
+    private sealed record StreamOpenAttempt(
+        IAsyncEnumerator<ChatResponseUpdate>? Enumerator,
+        string? ErrorMessage,
+        bool Cancelled);
 }

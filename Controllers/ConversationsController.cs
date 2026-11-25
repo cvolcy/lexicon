@@ -17,8 +17,6 @@ public class ConversationsController(
     IChatService chatService,
     IOptions<RagChatOptions> chatOptions) : ControllerBase
 {
-    private const int MaxTitleLength = 200;
-
     private static readonly JsonSerializerOptions SseJsonOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() },
@@ -40,11 +38,11 @@ public class ConversationsController(
         CancellationToken cancellationToken)
     {
         var trimmedTitle = request?.Title?.Trim();
-        if (trimmedTitle is { Length: > MaxTitleLength })
+        if (trimmedTitle is { Length: > Conversation.MaxTitleLength })
         {
             ModelState.AddModelError(
                 nameof(request.Title),
-                $"Conversation title must be at most {MaxTitleLength} characters.");
+                $"Conversation title must be at most {Conversation.MaxTitleLength} characters.");
             return ValidationProblem(ModelState);
         }
 
@@ -99,7 +97,13 @@ public class ConversationsController(
             return ValidationProblem(ModelState);
         }
 
-        if (!await chatService.ConversationExistsAsync(conversationId, cancellationToken))
+        var stream = await chatService.StartReplyStreamAsync(
+            conversationId,
+            trimmedContent,
+            request.DocumentIds,
+            cancellationToken);
+
+        if (stream is null)
         {
             return NotFound();
         }
@@ -112,11 +116,7 @@ public class ConversationsController(
 
         try
         {
-            await foreach (var evt in chatService.StreamReplyAsync(
-                conversationId,
-                trimmedContent,
-                request.DocumentIds,
-                cancellationToken))
+            await foreach (var evt in stream.WithCancellation(cancellationToken))
             {
                 var (eventName, payloadJson) = SerializeSseEvent(evt);
                 await Response.WriteAsync($"event: {eventName}\ndata: {payloadJson}\n\n", Encoding.UTF8, cancellationToken);

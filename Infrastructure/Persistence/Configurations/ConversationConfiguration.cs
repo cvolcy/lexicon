@@ -14,7 +14,7 @@ public class ConversationConfiguration : IEntityTypeConfiguration<Conversation>
         builder.HasKey(c => c.ConversationId);
         builder.Property(c => c.ConversationId).ValueGeneratedNever();
 
-        builder.Property(c => c.Title).HasMaxLength(200).IsRequired();
+        builder.Property(c => c.Title).HasMaxLength(Conversation.MaxTitleLength).IsRequired();
 
         // Stored as a sortable integer so ORDER BY / comparisons work on every provider (SQLite included).
         builder.Property(c => c.CreatedAt)
