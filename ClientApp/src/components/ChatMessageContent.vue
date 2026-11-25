@@ -2,7 +2,12 @@
 import { computed, createTextVNode, h, type VNode } from 'vue';
 import { useClipboard } from '@vueuse/core';
 import type { CitationViewModel } from '@/api/chat';
-import { parseMarkdown, type InlineNode, type TableAlignment } from '@/utils/markdown';
+import {
+  parseMarkdown,
+  type HeadingLevel,
+  type InlineNode,
+  type TableAlignment,
+} from '@/utils/markdown';
 
 const props = defineProps<{
   content: string;
@@ -69,6 +74,21 @@ function renderInlines(nodes: InlineNode[]): (VNode | string)[] {
 
 const InlineContent = (p: { nodes: InlineNode[] }) => renderInlines(p.nodes);
 
+function headingClass(level: HeadingLevel): string {
+  switch (level) {
+    case 1:
+      return 'text-base font-semibold tracking-tight text-highlighted';
+    case 2:
+      return 'text-sm font-semibold tracking-tight text-highlighted';
+    case 3:
+      return 'text-sm font-medium text-highlighted';
+    case 4:
+      return 'text-sm font-medium text-default';
+    default:
+      return 'text-xs font-semibold uppercase tracking-wide text-muted';
+  }
+}
+
 function alignmentClass(alignment: TableAlignment): string {
   switch (alignment) {
     case 'center':
@@ -84,24 +104,15 @@ function alignmentClass(alignment: TableAlignment): string {
 <template>
   <div class="space-y-2.5 text-sm leading-relaxed text-default">
     <template v-for="(block, index) in blocks" :key="index">
-      <h1
-        v-if="block.type === 'heading' && block.level === 1"
-        class="text-base font-semibold tracking-tight text-highlighted"
+      <component
+        :is="`h${block.level}`"
+        v-if="block.type === 'heading'"
+        :class="headingClass(block.level)"
       >
         <InlineContent :nodes="block.inlines" />
-      </h1>
-      <h2
-        v-else-if="block.type === 'heading' && block.level === 2"
-        class="text-sm font-semibold tracking-tight text-highlighted"
-      >
-        <InlineContent :nodes="block.inlines" />
-      </h2>
-      <h3
-        v-else-if="block.type === 'heading' && block.level === 3"
-        class="text-sm font-medium text-highlighted"
-      >
-        <InlineContent :nodes="block.inlines" />
-      </h3>
+      </component>
+
+      <hr v-else-if="block.type === 'hr'" class="my-2 border-default" />
 
       <div
         v-else-if="block.type === 'code'"

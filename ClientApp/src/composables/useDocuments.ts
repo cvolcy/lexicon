@@ -82,6 +82,10 @@ export function useDocuments() {
   }
 
   async function create(file: File): Promise<boolean> {
+    if (busy.value) {
+      return false;
+    }
+
     const formData = new FormData();
     formData.append('file', file);
     createPayload.value = formData;
@@ -94,6 +98,10 @@ export function useDocuments() {
   }
 
   async function reindex(documentId: string): Promise<boolean> {
+    if (busy.value) {
+      return false;
+    }
+
     reindexId.value = documentId;
     reindexingId.value = documentId;
 
@@ -105,6 +113,10 @@ export function useDocuments() {
   }
 
   async function remove(documentId: string): Promise<boolean> {
+    if (busy.value) {
+      return false;
+    }
+
     deleteId.value = documentId;
     deletingId.value = documentId;
 

@@ -1,5 +1,6 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import type {
+  ChatClient,
   ChatMessageViewModel,
   ConversationSummaryViewModel,
 } from '@/api/chat';
@@ -9,7 +10,7 @@ function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === 'AbortError';
 }
 
-export function useChat() {
+export function useChat(client: ChatClient = chatClient) {
   const conversations = ref<ConversationSummaryViewModel[]>([]);
   const activeConversationId = ref<string | null>(null);
   const messages = ref<ChatMessageViewModel[]>([]);
@@ -32,7 +33,7 @@ export function useChat() {
   }
 
   async function refreshConversationsList(): Promise<void> {
-    conversations.value = await chatClient.listConversations();
+    conversations.value = await client.listConversations();
   }
 
   async function selectConversation(conversationId: string): Promise<void> {
@@ -42,7 +43,7 @@ export function useChat() {
     activeConversationId.value = conversationId;
 
     try {
-      const detail = await chatClient.getConversation(conversationId);
+      const detail = await client.getConversation(conversationId);
       if (activeConversationId.value === conversationId) {
         messages.value = detail.messages;
       }
@@ -51,7 +52,9 @@ export function useChat() {
         error.value = err instanceof Error ? err.message : 'Unable to load conversation.';
       }
     } finally {
-      loadingMessages.value = false;
+      if (activeConversationId.value === conversationId) {
+        loadingMessages.value = false;
+      }
     }
   }
 
@@ -88,7 +91,7 @@ export function useChat() {
     error.value = null;
 
     try {
-      await chatClient.deleteConversation(conversationId);
+      await client.deleteConversation(conversationId);
       conversations.value = conversations.value.filter(
         (c) => c.conversationId !== conversationId,
       );
@@ -118,7 +121,7 @@ export function useChat() {
     let conversationId = activeConversationId.value;
     if (!conversationId) {
       try {
-        const created = await chatClient.createConversation();
+        const created = await client.createConversation();
         conversationId = created.conversationId;
         activeConversationId.value = conversationId;
         conversations.value = [created, ...conversations.value];
@@ -156,7 +159,7 @@ export function useChat() {
     streamAbortController = controller;
 
     try {
-      await chatClient.streamMessage(
+      await client.streamMessage(
         conversationId,
         {
           content: trimmed,

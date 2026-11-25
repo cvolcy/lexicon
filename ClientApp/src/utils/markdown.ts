@@ -6,9 +6,11 @@ export type InlineNode =
   | { type: 'citation'; index: number };
 
 export type TableAlignment = 'left' | 'center' | 'right' | null;
+export type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type MarkdownBlock =
-  | { type: 'heading'; level: 1 | 2 | 3; inlines: InlineNode[] }
+  | { type: 'heading'; level: HeadingLevel; inlines: InlineNode[] }
+  | { type: 'hr' }
   | { type: 'code'; language: string; content: string }
   | { type: 'blockquote'; inlines: InlineNode[] }
   | { type: 'list'; ordered: boolean; items: InlineNode[][] }
@@ -234,11 +236,16 @@ function parseTableHeader(
   return { headerCells, alignments };
 }
 
+function isHorizontalRule(trimmed: string): boolean {
+  return /^(?:-\s*){3,}$|^(?:\*\s*){3,}$|^(?:_\s*){3,}$/.test(trimmed);
+}
+
 function isNonTableBlockStart(trimmed: string): boolean {
   return (
     trimmed.startsWith('```') ||
-    /^#{1,3}\s+\S/.test(trimmed) ||
+    /^#{1,6}\s+\S/.test(trimmed) ||
     trimmed.startsWith('> ') ||
+    isHorizontalRule(trimmed) ||
     /^[-*]\s+/.test(trimmed) ||
     /^\d+\.\s+/.test(trimmed)
   );
@@ -280,15 +287,22 @@ export function parseMarkdown(
       continue;
     }
 
-    // Headings (#, ##, ###)
-    const headingMatch = /^(#{1,3})\s+(.+)$/.exec(trimmed);
+    // Headings (# through ######)
+    const headingMatch = /^(#{1,6})\s+(.+)$/.exec(trimmed);
     if (headingMatch) {
-      const level = headingMatch[1]!.length as 1 | 2 | 3;
+      const level = headingMatch[1]!.length as HeadingLevel;
       blocks.push({
         type: 'heading',
         level,
         inlines: parseInlineMarkdown(headingMatch[2]!, availableCitations),
       });
+      i++;
+      continue;
+    }
+
+    // Horizontal rule (must run before unordered list for `- - -` / `* * *`)
+    if (isHorizontalRule(trimmed)) {
+      blocks.push({ type: 'hr' });
       i++;
       continue;
     }

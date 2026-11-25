@@ -6,46 +6,8 @@ import type {
   ConversationDetailViewModel,
   ConversationSummaryViewModel,
 } from '@/api/chat';
-import type { CollectionResponse, ProblemDetails } from '@/api/types';
-
-async function readErrorMessage(response: Response): Promise<string> {
-  try {
-    const problem = (await response.json()) as ProblemDetails;
-    const validation = problem.errors
-      ? Object.values(problem.errors).flat().filter(Boolean)
-      : [];
-    if (validation.length > 0) {
-      return validation.join(' ');
-    }
-    if (problem.detail ?? problem.title) {
-      return (problem.detail ?? problem.title)!;
-    }
-  } catch {
-    // Response body is not JSON; fall back to HTTP status.
-  }
-
-  return `HTTP ${response.status} ${response.statusText}`.trim();
-}
-
-async function fetchJson<T>(url: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      Accept: 'application/json',
-      ...init.headers,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(await readErrorMessage(response));
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return (await response.json()) as T;
-}
+import { readResponseErrorMessage } from '@/api/problemDetails';
+import type { CollectionResponse } from '@/api/types';
 
 function dispatchSseEvent(
   eventName: string,
@@ -54,31 +16,43 @@ function dispatchSseEvent(
 ): void {
   if (!data) return;
 
-  switch (eventName) {
-    case 'token': {
-      const parsed = JSON.parse(data) as { content?: string } | string;
-      const content = typeof parsed === 'string' ? parsed : (parsed.content ?? '');
-      if (content) {
-        onEvent({ type: 'token', content });
-      }
-      break;
-    }
-    case 'citations': {
-      const citations = JSON.parse(data) as CitationViewModel[];
-      onEvent({ type: 'citations', citations });
-      break;
-    }
-    case 'done': {
-      const message = JSON.parse(data) as ChatMessageViewModel;
-      onEvent({ type: 'done', message });
-      break;
-    }
-    case 'error': {
+  if (eventName === 'error') {
+    try {
       const parsed = JSON.parse(data) as { message?: string } | string;
       const message = typeof parsed === 'string' ? parsed : (parsed.message ?? 'Streaming failed.');
       onEvent({ type: 'error', message });
-      break;
+    } catch {
+      onEvent({ type: 'error', message: data });
     }
+    return;
+  }
+
+  try {
+    switch (eventName) {
+      case 'token': {
+        const parsed = JSON.parse(data) as { content?: string } | string;
+        const content = typeof parsed === 'string' ? parsed : (parsed.content ?? '');
+        if (content) {
+          onEvent({ type: 'token', content });
+        }
+        break;
+      }
+      case 'citations': {
+        const citations = JSON.parse(data) as CitationViewModel[];
+        onEvent({ type: 'citations', citations });
+        break;
+      }
+      case 'done': {
+        const message = JSON.parse(data) as ChatMessageViewModel;
+        onEvent({ type: 'done', message });
+        break;
+      }
+    }
+  } catch {
+    onEvent({
+      type: 'error',
+      message: 'Received a malformed streaming event from the server.',
+    });
   }
 }
 
@@ -91,7 +65,7 @@ function parseSseBlock(block: string, onEvent: (event: ChatStreamEvent) => void)
     if (line.startsWith('event:')) {
       eventName = line.slice(6).trim();
     } else if (line.startsWith('data:')) {
-      dataLines.push(line.slice(5).trimStart());
+      dataLines.push(line.startsWith('data: ') ? line.slice(6) : line.slice(5));
     }
   }
 
@@ -103,7 +77,27 @@ function parseSseBlock(block: string, onEvent: (event: ChatStreamEvent) => void)
 /**
  * Production HTTP + SSE client targeting the Phase 4 Conversations API.
  */
-export function createHttpChatClient(): ChatClient {
+export function createHttpChatClient(fetchFn: typeof fetch = fetch): ChatClient {
+  async function fetchJson<T>(url: string, init: RequestInit = {}): Promise<T> {
+    const response = await fetchFn(url, {
+      ...init,
+      headers: {
+        Accept: 'application/json',
+        ...init.headers,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await readResponseErrorMessage(response));
+    }
+
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return (await response.json()) as T;
+  }
+
   return {
     async listConversations(signal) {
       const result = await fetchJson<CollectionResponse<ConversationSummaryViewModel>>(
@@ -137,7 +131,7 @@ export function createHttpChatClient(): ChatClient {
     },
 
     async streamMessage(conversationId, request, onEvent, signal) {
-      const response = await fetch(
+      const response = await fetchFn(
         `/api/conversations/${encodeURIComponent(conversationId)}/messages`,
         {
           method: 'POST',
@@ -151,7 +145,7 @@ export function createHttpChatClient(): ChatClient {
       );
 
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response));
+        throw new Error(await readResponseErrorMessage(response));
       }
 
       if (!response.body) {
