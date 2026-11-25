@@ -18,6 +18,7 @@ public sealed class DocumentIngestionProcessor(
     AiModelInfo aiModelInfo,
     IVectorStore vectorStore,
     IKeywordIndex keywordIndex,
+    TimeProvider timeProvider,
     ILogger<DocumentIngestionProcessor> logger) : IDocumentIngestionProcessor
 {
     private const int MaxErrorLength = 2000;
@@ -36,7 +37,7 @@ public sealed class DocumentIngestionProcessor(
 
         document.Status = DocumentStatus.Processing;
         document.Error = null;
-        document.UpdatedAt = DateTimeOffset.UtcNow;
+        document.UpdatedAt = timeProvider.GetUtcNow();
         await dbContext.SaveChangesAsync(cancellationToken);
 
         try
@@ -70,6 +71,19 @@ public sealed class DocumentIngestionProcessor(
             var embeddings = await GenerateEmbeddingsAsync(chunks, cancellationToken);
 
             await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            var stillExists = await dbContext.Documents
+                .AsNoTracking()
+                .AnyAsync(d => d.DocumentId == documentId, cancellationToken);
+
+            if (!stillExists)
+            {
+                logger.LogInformation(
+                    "Skipping commit for document {DocumentId} ({FileName}) because it was deleted during ingestion.",
+                    documentId,
+                    document.FileName);
+                return;
+            }
 
             await vectorStore.DeleteByDocumentAsync(documentId, cancellationToken);
             await keywordIndex.DeleteByDocumentAsync(documentId, cancellationToken);
@@ -111,7 +125,7 @@ public sealed class DocumentIngestionProcessor(
             document.ChunkCount = chunkEntities.Count;
             document.Status = DocumentStatus.Ready;
             document.Error = null;
-            document.UpdatedAt = DateTimeOffset.UtcNow;
+            document.UpdatedAt = timeProvider.GetUtcNow();
 
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -130,7 +144,7 @@ public sealed class DocumentIngestionProcessor(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Ingestion failed for document {DocumentId} ({FileName}).", documentId, document.FileName);
-            await MarkFailedAsync(documentId, ex.Message, CancellationToken.None);
+            await MarkFailedAsync(documentId, FormatSafeErrorMessage(ex), CancellationToken.None);
         }
     }
 
@@ -165,7 +179,7 @@ public sealed class DocumentIngestionProcessor(
         dbContext.ChangeTracker.Clear();
 
         var truncatedError = reason.Length > MaxErrorLength ? reason[..MaxErrorLength] : reason;
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
 
         await dbContext.Documents
             .Where(d => d.DocumentId == documentId)
@@ -176,4 +190,12 @@ public sealed class DocumentIngestionProcessor(
                     .SetProperty(d => d.UpdatedAt, now),
                 cancellationToken);
     }
+
+    private static string FormatSafeErrorMessage(Exception ex) => ex switch
+    {
+        HttpRequestException => "Failed to reach the AI embedding provider while indexing the document.",
+        TaskCanceledException or TimeoutException => "Timed out while generating embeddings for the document.",
+        InvalidDataException or FormatException => "Document content could not be read or parsed.",
+        _ => "Document ingestion failed unexpectedly. Check server logs for details.",
+    };
 }

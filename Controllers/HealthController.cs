@@ -8,7 +8,8 @@ namespace Lexicon.Controllers;
 [Route("api/[controller]")]
 public class HealthController(
     IHostEnvironment env,
-    HealthCheckService healthCheckService) : ControllerBase
+    HealthCheckService healthCheckService,
+    TimeProvider timeProvider) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType<HealthViewModel>(StatusCodes.Status200OK)]
@@ -29,7 +30,7 @@ public class HealthController(
         var viewModel = new HealthViewModel(
             Status: report.Status,
             Environment: env.EnvironmentName,
-            TimestampUtc: DateTimeOffset.UtcNow,
+            TimestampUtc: timeProvider.GetUtcNow(),
             Checks: checks);
 
         var statusCode = report.Status == HealthStatus.Unhealthy

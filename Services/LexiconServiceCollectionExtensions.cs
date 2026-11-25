@@ -2,6 +2,7 @@ using Lexicon.Services.Chat;
 using Lexicon.Services.Documents;
 using Lexicon.Services.Ingestion;
 using Lexicon.Services.Retrieval;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Lexicon.Services;
 
@@ -11,6 +12,7 @@ public static class LexiconServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.TryAddSingleton(TimeProvider.System);
         services.AddLexiconDocumentServices(configuration);
         services.AddLexiconIngestionServices(configuration);
         services.AddLexiconRetrievalServices(configuration);

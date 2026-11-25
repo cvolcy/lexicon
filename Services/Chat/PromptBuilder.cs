@@ -58,7 +58,7 @@ public sealed class PromptBuilder(IOptions<RagChatOptions> options) : IPromptBui
 
         foreach (var chunk in retrievedChunks)
         {
-            var chunkTokens = EstimateTokens(chunk.Text);
+            var chunkTokens = TokenEstimator.Estimate(chunk.Text);
             if (citations.Count > 0 && usedTokens + chunkTokens > maxContextTokens)
             {
                 break;
@@ -92,7 +92,7 @@ public sealed class PromptBuilder(IOptions<RagChatOptions> options) : IPromptBui
                 continue;
             }
 
-            var messageTokens = EstimateTokens(message.Content);
+            var messageTokens = TokenEstimator.Estimate(message.Content);
             if (selected.Count > 0 && usedTokens + messageTokens > maxHistoryTokens)
             {
                 break;
@@ -157,7 +157,4 @@ public sealed class PromptBuilder(IOptions<RagChatOptions> options) : IPromptBui
             _ => null,
         };
     }
-
-    private static int EstimateTokens(string text)
-        => string.IsNullOrWhiteSpace(text) ? 0 : (int)Math.Ceiling(text.Length / 4.0);
 }

@@ -2,6 +2,9 @@ namespace Lexicon.Models.Chat;
 
 public class Conversation
 {
+    public const int MaxTitleLength = 200;
+    public const string DefaultTitle = "New conversation";
+
     public Guid ConversationId { get; set; }
 
     public required string Title { get; set; }

@@ -13,6 +13,7 @@ public sealed class DocumentService(
     IIngestionQueue ingestionQueue,
     IVectorStore vectorStore,
     IKeywordIndex keywordIndex,
+    TimeProvider timeProvider,
     ILogger<DocumentService> logger) : IDocumentService
 {
     public async Task<IReadOnlyList<DocumentViewModel>> ListAsync(CancellationToken cancellationToken = default)
@@ -40,7 +41,7 @@ public sealed class DocumentService(
         Stream content,
         CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var documentId = Guid.CreateVersion7();
         var storageKey = await documentStorage.SaveAsync(documentId, fileName, content, cancellationToken);
 
@@ -120,7 +121,7 @@ public sealed class DocumentService(
 
         document.Status = DocumentStatus.Pending;
         document.Error = null;
-        document.UpdatedAt = DateTimeOffset.UtcNow;
+        document.UpdatedAt = timeProvider.GetUtcNow();
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await ingestionQueue.EnqueueAsync(document.DocumentId, cancellationToken);
